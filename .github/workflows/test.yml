@@ -13,7 +13,7 @@ jobs:
 
       - name: Regression guard (old module path)
         run: |
-          if git grep -n "github.com/dingbo/dingovault"; then
+          if git grep -n "github.com/dingbo/dingovault" -- . ":(exclude).github/workflows/test.yml"; then
             echo "Found legacy module path github.com/dingbo/dingovault"
             exit 1
           fi
