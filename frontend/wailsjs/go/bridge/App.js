@@ -26,6 +26,10 @@ export function GetAppVersion() {
   return window['go']['bridge']['App']['GetAppVersion']();
 }
 
+export function GetLocale() {
+  return window['go']['bridge']['App']['GetLocale']();
+}
+
 export function GetPage(arg1) {
   return window['go']['bridge']['App']['GetPage'](arg1);
 }
@@ -80,6 +84,10 @@ export function SearchBlocks(arg1) {
 
 export function SetTheme(arg1) {
   return window['go']['bridge']['App']['SetTheme'](arg1);
+}
+
+export function SetLocale(arg1) {
+  return window['go']['bridge']['App']['SetLocale'](arg1);
 }
 
 export function Startup(arg1) {

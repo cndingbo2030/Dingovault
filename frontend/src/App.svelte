@@ -13,6 +13,8 @@
 
 <script>
   import { onMount, tick } from 'svelte'
+  import { fly, fade } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import {
     NotesRoot,
     GetPage,
@@ -28,9 +30,12 @@
     SetTheme,
     GetWikiGraph,
     ReorderBlockBefore,
-    GetAppVersion
+    GetAppVersion,
+    GetLocale,
+    SetLocale
   } from '../wailsjs/go/bridge/App.js'
   import { EventsOn } from '../wailsjs/runtime/runtime.js'
+  import { locale, messages, tr, detectBrowserLocale, normalizeLocaleTag } from './lib/i18n/index.js'
   import OutlineNode from './OutlineNode.svelte'
   import PageGraph from './PageGraph.svelte'
   import Backlinks from './Backlinks.svelte'
@@ -48,6 +53,16 @@
   let err = ''
   let lastFileEvent = ''
   let indexEpoch = 0
+  let pageLoading = false
+  let indexPulse = false
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let pulseTimer
+
+  $: L = $messages
+  /** @param {string} path @param {Record<string, string | number> | undefined} [vars] */
+  function T(path, vars) {
+    return tr(L, path, vars)
+  }
 
   /** @type {Record<string, boolean>} */
   let collapsedState = {}
@@ -76,10 +91,24 @@
 
   /** @param {string} root */
   function vaultBasename(root) {
-    if (!root) return 'Vault'
+    if (!root) return T('app.vault')
     const p = root.replace(/[/\\]+$/, '')
     const parts = p.split(/[/\\]/).filter(Boolean)
-    return parts.length ? parts[parts.length - 1] : 'Vault'
+    return parts.length ? parts[parts.length - 1] : T('app.vault')
+  }
+
+  /** @param {string} code */
+  async function setLanguage(code) {
+    err = ''
+    const n = normalizeLocaleTag(code)
+    try {
+      await SetLocale(n === 'zh-CN' ? 'zh-CN' : 'en')
+    } catch (e) {
+      notifyErr(e)
+      return
+    }
+    locale.set(n)
+    document.documentElement.lang = n === 'zh-CN' ? 'zh-CN' : 'en'
   }
 
   $: breadcrumbSegments = pagePath.split('/').filter(Boolean)
@@ -130,9 +159,9 @@
     const text = lines.join('\n\n')
     try {
       await navigator.clipboard.writeText(text)
-      pushToast(`Copied ${lines.length} block(s)`, 'info')
+      pushToast(T('app.copiedBlocks', { count: lines.length }), 'info')
     } catch {
-      pushToast('Clipboard failed', 'error')
+      pushToast(T('app.clipboardFailed'), 'error')
     }
   }
 
@@ -182,7 +211,7 @@
 
   /** @param {string} id */
   async function handleSwipeClear(id) {
-    if (typeof window !== 'undefined' && !window.confirm('Clear this block text?')) return
+    if (typeof window !== 'undefined' && !window.confirm(T('app.confirmClearBlock'))) return
     err = ''
     try {
       await syncAllBlocksFromDOM()
@@ -194,10 +223,24 @@
   }
 
   onMount(() => {
-    document.documentElement.style.setProperty(
-      '--dv-font',
-      'ui-sans-serif, system-ui, "Inter", "Segoe UI", sans-serif'
-    )
+    document.documentElement.style.setProperty('--dv-font', "var(--dv-font-sans, 'Inter', system-ui, sans-serif)")
+
+    void (async () => {
+      try {
+        let loc = await GetLocale()
+        if (!loc) {
+          loc = detectBrowserLocale()
+          await SetLocale(loc)
+        }
+        const n = normalizeLocaleTag(loc)
+        locale.set(n)
+        document.documentElement.lang = n === 'zh-CN' ? 'zh-CN' : 'en'
+      } catch {
+        const fb = detectBrowserLocale()
+        locale.set(fb)
+        document.documentElement.lang = fb === 'zh-CN' ? 'zh-CN' : 'en'
+      }
+    })()
 
     GetTheme()
       .then((t) => {
@@ -216,6 +259,11 @@
 
     EventsOn('file-updated', async (payload) => {
       indexEpoch++
+      if (pulseTimer) clearTimeout(pulseTimer)
+      indexPulse = true
+      pulseTimer = setTimeout(() => {
+        indexPulse = false
+      }, 1200)
       const abs = payload && typeof payload === 'object' && 'path' in payload ? /** @type {any} */ (payload).path : ''
       lastFileEvent = String(abs)
       const relEvt = toRelPath(String(abs), notesRoot).replace(/^\//, '')
@@ -250,6 +298,7 @@
     const focusId = opts?.focusBlockId
     const caret = opts?.caretOffset
     err = ''
+    pageLoading = true
     try {
       roots = await GetPage(rel)
       pagePath = rel
@@ -269,6 +318,8 @@
     } catch (e) {
       notifyErr(e)
       roots = []
+    } finally {
+      pageLoading = false
     }
   }
 
@@ -413,7 +464,7 @@
       const rel = toRelPath(abs, notesRoot)
       const tree = await GetPage(rel)
       if (!tree.length) {
-        if (!confirm(`Create page "${rel}"?`)) return
+        if (!confirm(T('app.createPage', { path: rel }))) return
         await EnsurePage(rel)
       }
       await loadPage(rel)
@@ -430,7 +481,7 @@
 </script>
 
 <main class="layout zen">
-  <nav class="breadcrumbs" aria-label="Breadcrumb">
+  <nav class="breadcrumbs" class:index-pulse={indexPulse} aria-label={T('app.breadcrumb')}>
     <span class="crumb vault">{vaultBasename(notesRoot)}</span>
     {#if breadcrumbSegments.length > 1}
       {#each breadcrumbSegments.slice(0, -1) as seg}
@@ -445,22 +496,39 @@
   </nav>
 
   <header class="top">
-    <h1>Dingovault</h1>
+    <h1>{T('app.title')}</h1>
     <p class="meta">{notesRoot || '…'}</p>
     {#if lastFileEvent}
-      <p class="event">Last index event: <code>{lastFileEvent}</code></p>
+      <p class="event">{T('app.lastIndex')}: <code>{lastFileEvent}</code></p>
     {/if}
   </header>
 
   <div class="toolbar">
-    <input class="path-input" bind:value={pagePath} placeholder="path/to/page.md" />
-    <button type="button" class="btn" on:click={() => loadPage(pagePath)}>Open</button>
-    <button type="button" class="btn secondary" on:click={openOrCreate}>Ensure page</button>
-    <button type="button" class="btn secondary" on:click={toggleTheme} title="Toggle light/dark">
-      {theme === 'dark' ? 'Light' : 'Dark'} mode
+    <input class="path-input" bind:value={pagePath} placeholder={T('app.pathPlaceholder')} />
+    <button type="button" class="btn" on:click={() => loadPage(pagePath)}>{T('app.open')}</button>
+    <button type="button" class="btn secondary" on:click={openOrCreate}>{T('app.ensurePage')}</button>
+    <button
+      type="button"
+      class="btn secondary"
+      on:click={toggleTheme}
+      title={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+    >
+      {theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
     </button>
-    <button type="button" class="btn secondary" on:click={openGraph}>Graph</button>
-    <button type="button" class="btn secondary" on:click={openAbout}>About</button>
+    <span class="lang-toolbar" role="group" aria-label={T('app.langLabel')}>
+      <button
+        type="button"
+        class="btn secondary lang-btn"
+        class:active={$locale === 'en'}
+        on:click={() => setLanguage('en')}>{T('app.langEn')}</button>
+      <button
+        type="button"
+        class="btn secondary lang-btn"
+        class:active={$locale === 'zh-CN'}
+        on:click={() => setLanguage('zh-CN')}>{T('app.langZh')}</button>
+    </span>
+    <button type="button" class="btn secondary" on:click={openGraph}>{T('app.graph')}</button>
+    <button type="button" class="btn secondary" on:click={openAbout}>{T('app.about')}</button>
     {#each $toolbarEntries as p (p.id)}
       <button
         type="button"
@@ -471,10 +539,10 @@
   </div>
 
   {#if selectedIds.length > 0}
-    <div class="bulk-bar" role="toolbar" aria-label="Multi-select">
-      <span class="bulk-count">{selectedIds.length} selected</span>
-      <button type="button" class="btn secondary sm" on:click={copySelectedMarkdown}>Copy text</button>
-      <button type="button" class="btn secondary sm" on:click={clearSelection}>Clear</button>
+    <div class="bulk-bar" role="toolbar" aria-label={T('app.multiSelect')}>
+      <span class="bulk-count">{T('app.selectedCount', { count: selectedIds.length })}</span>
+      <button type="button" class="btn secondary sm" on:click={copySelectedMarkdown}>{T('app.copyText')}</button>
+      <button type="button" class="btn secondary sm" on:click={clearSelection}>{T('app.clear')}</button>
     </div>
   {/if}
 
@@ -482,25 +550,35 @@
     <div
       class="about-backdrop"
       role="presentation"
+      transition:fade={{ duration: 160 }}
       on:click|self={() => (aboutOpen = false)}
     >
-      <div class="about-card" role="dialog" aria-modal="true" aria-labelledby="about-title">
-        <h2 id="about-title">Dingovault</h2>
+      <div
+        class="about-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="about-title"
+        transition:fly={{ y: 16, duration: 220, easing: cubicOut }}
+      >
+        <h2 id="about-title">{T('app.title')}</h2>
         <p class="about-ver">{appVersion || '…'}</p>
         <p class="about-copy">
-          Local-first outliner with Markdown blocks, FTS search, and optional cloud sync. See the repository README for
-          setup, SaaS mode, and security notes.
+          {T('app.aboutBody')}
         </p>
-        <button type="button" class="btn secondary" on:click={() => (aboutOpen = false)}>Close</button>
+        <button type="button" class="btn secondary" on:click={() => (aboutOpen = false)}>{T('app.close')}</button>
       </div>
     </div>
   {/if}
 
   {#if graphOpen}
-    <section class="graph-panel">
+    <section
+      class="graph-panel"
+      in:fly={{ y: 14, duration: 240, easing: cubicOut }}
+      out:fade={{ duration: 160 }}
+    >
       <div class="graph-head">
-        <h2>Page graph</h2>
-        <button type="button" class="btn secondary sm" on:click={() => (graphOpen = false)}>Close</button>
+        <h2>{T('app.pageGraph')}</h2>
+        <button type="button" class="btn secondary sm" on:click={() => (graphOpen = false)}>{T('app.close')}</button>
       </div>
       <PageGraph graph={graphData} />
     </section>
@@ -511,9 +589,26 @@
   {/if}
 
   <section class="outliner-panel">
-    <h2>Outline</h2>
-    {#if roots.length === 0}
-      <p class="empty">No blocks — open a Markdown file or create one.</p>
+    <h2>{T('app.outline')}</h2>
+    {#if pageLoading}
+      <div class="skeleton-stack" aria-busy="true">
+        {#each [88, 92, 78, 85, 70] as w, i (i)}
+          <div class="sk-line" style="width: {w}%"></div>
+        {/each}
+      </div>
+    {:else if roots.length === 0}
+      <div class="empty-state">
+        <div class="empty-svg" aria-hidden="true">
+          <svg viewBox="0 0 120 100" width="120" height="100">
+            <rect x="12" y="18" width="96" height="64" rx="10" fill="none" stroke="currentColor" stroke-opacity="0.2" stroke-width="1.5"/>
+            <path d="M28 38h64M28 52h48M28 66h56" stroke="currentColor" stroke-opacity="0.25" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="88" cy="30" r="6" fill="currentColor" fill-opacity="0.12"/>
+          </svg>
+        </div>
+        <p class="empty-title">{T('app.emptyTitle')}</p>
+        <p class="empty-sub">{T('app.emptySubtitle')}</p>
+        <p class="empty-tip"><strong>{T('app.emptyCta')}</strong> {T('app.emptyCtaBody')}</p>
+      </div>
     {:else}
       {#each roots as r (r.id)}
         <OutlineNode
@@ -542,7 +637,12 @@
   <Backlinks {notesRoot} {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
 
   {#if $sidebarEntries.length}
-    <aside class="plugin-sidebar" aria-label="Plugin sidebar">
+    <aside
+      class="plugin-sidebar"
+      aria-label="Plugin sidebar"
+      in:fly={{ x: 18, duration: 260, easing: cubicOut }}
+      out:fade={{ duration: 140 }}
+    >
       {#each $sidebarEntries as s (s.id)}
         <section class="plugin-card">
           <h3 class="plugin-card-title">{s.title}</h3>
@@ -553,10 +653,7 @@
   {/if}
 
   <p class="hint">
-    <kbd>Ctrl</kbd>+<kbd>K</kbd> palette · <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> indent ·
-    <kbd>Cmd</kbd>+<kbd>Enter</kbd> TODO cycle · <kbd>/</kbd> commands · <kbd>Enter</kbd> at end adds sibling ·
-    drag <span class="hint-mono">⠿</span> to reorder siblings · fold <span class="hint-mono">▾</span> · checkboxes
-    multi-select · mobile: swipe rail <span class="hint-mono">←</span> TODO · <span class="hint-mono">→</span> clear
+        {T('app.hint')}
   </p>
 </main>
 
@@ -599,8 +696,100 @@
     min-height: 100vh;
     background: transparent;
     color: var(--dv-fg);
-    font-family: var(--dv-font, system-ui, sans-serif);
+    font-family: var(--dv-font, var(--dv-font-sans, 'Inter', system-ui, sans-serif));
+    font-size: 15px;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+  }
+
+  @keyframes dv-reindex-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(120, 160, 255, 0);
+    }
+    45% {
+      box-shadow: 0 0 0 4px rgba(120, 160, 255, 0.18);
+    }
+  }
+
+  .breadcrumbs.index-pulse {
+    border-radius: 8px;
+    animation: dv-reindex-pulse 0.9s ease-in-out 2;
+  }
+
+  .lang-toolbar {
+    display: inline-flex;
+    gap: 4px;
+    margin: 0 2px;
+  }
+  .lang-btn.active {
+    border-color: rgba(120, 160, 255, 0.45);
+    background: rgba(120, 160, 255, 0.12);
+  }
+
+  .skeleton-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 0 4px;
+  }
+  .sk-line {
+    height: 1.05em;
+    border-radius: 6px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--dv-fg) 8%, transparent) 0%,
+      color-mix(in srgb, var(--dv-fg) 14%, transparent) 50%,
+      color-mix(in srgb, var(--dv-fg) 8%, transparent) 100%
+    );
+    background-size: 200% 100%;
+    animation: dv-shimmer 1.1s ease-in-out infinite;
+  }
+  @keyframes dv-shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 28px 16px 20px;
+    border-radius: 12px;
+    border: 1px dashed color-mix(in srgb, var(--dv-fg) 18%, transparent);
+    background: color-mix(in srgb, var(--dv-fg) 3%, transparent);
+  }
+  .empty-svg {
+    color: var(--dv-fg);
+    opacity: 0.45;
+    margin-bottom: 12px;
+  }
+  .empty-title {
+    margin: 0 0 8px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .empty-sub {
+    margin: 0 0 12px;
+    font-size: 0.9rem;
+    opacity: 0.72;
+    line-height: 1.5;
+    max-width: 36ch;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .empty-tip {
+    margin: 0;
+    font-size: 0.82rem;
+    opacity: 0.55;
+    line-height: 1.45;
+  }
+  .empty-tip strong {
+    font-weight: 600;
+    opacity: 0.85;
   }
 
   .layout {
@@ -718,10 +907,6 @@
     letter-spacing: 0.06em;
     opacity: 0.55;
   }
-  .empty {
-    opacity: 0.55;
-    font-size: 0.9rem;
-  }
   .bulk-bar {
     display: flex;
     flex-wrap: wrap;
@@ -769,7 +954,7 @@
   }
   .about-ver {
     margin: 0 0 12px;
-    font-family: ui-monospace, monospace;
+    font-family: var(--dv-font-mono, 'JetBrains Mono', monospace);
     font-size: 0.85rem;
     opacity: 0.65;
   }
@@ -805,11 +990,6 @@
     font-size: 0.8rem;
     opacity: 0.5;
   }
-  .hint-mono {
-    font-family: ui-monospace, monospace;
-    font-size: 0.72rem;
-    opacity: 0.75;
-  }
   .plugin-tb {
     font-size: 0.85rem;
   }
@@ -837,12 +1017,5 @@
     font-size: 0.88rem;
     line-height: 1.45;
     white-space: pre-wrap;
-  }
-  kbd {
-    font-size: 0.75rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(0, 0, 0, 0.25);
   }
 </style>

@@ -11,8 +11,10 @@ const appDirName = "dingovault"
 
 // Config is persisted under the OS user config directory.
 type Config struct {
-	VaultPath       string `json:"vaultPath"`
-	Theme           string `json:"theme"`
+	VaultPath string `json:"vaultPath"`
+	Theme     string `json:"theme"`
+	// Locale is a BCP 47 tag; supported UI catalogs: en, zh-CN (empty = first-run detect in desktop).
+	Locale          string `json:"locale,omitempty"`
 	Window          Window `json:"window"`
 	GitRemoteOrigin string `json:"gitRemoteOrigin,omitempty"` // optional GitHub (or other) remote for vault sync
 	// CloudMode uses RemoteStore (HTTP API) instead of local SQLite; vaultPath remains the on-disk markdown root.

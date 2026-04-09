@@ -2,7 +2,7 @@
 .PHONY: build release dev clean benchmark fmt lint-frontend dist dist-dmg deploy-saas
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-APP_VERSION ?= 1.0.0-gold
+APP_VERSION ?= 1.1.0-beta
 GO_LDFLAGS_X := -X github.com/dingbo/dingovault/internal/version.String=$(APP_VERSION)
 DIST_ARCH ?= $(shell uname -m)
 DIST_BUNDLE = dingovault-$(VERSION)-darwin-$(DIST_ARCH)

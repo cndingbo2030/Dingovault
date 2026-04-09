@@ -1,8 +1,11 @@
 <script>
   import { tick } from 'svelte'
+  import { fly, fade } from 'svelte/transition'
+  import { cubicOut } from 'svelte/easing'
   import { ListVaultPages, SearchBlocks } from '../wailsjs/go/bridge/App.js'
   import { rankPagePaths } from './fuzzyMatch.js'
   import { readRecentPages } from './recentPages.js'
+  import { messages, tr } from './lib/i18n/index.js'
 
   /** @type {boolean} */
   export let open = false
@@ -26,6 +29,12 @@
   let prevOpen = false
   /** @type {HTMLInputElement | undefined} */
   let inputEl
+
+  $: L = $messages
+  /** @param {string} path @param {Record<string, string | number> | undefined} [vars] */
+  function T(path, vars) {
+    return tr(L, path, vars)
+  }
 
   /** @param {string} p */
   function pageTitle(p) {
@@ -63,19 +72,19 @@
       return recent.slice(0, 14).map((path) => ({
         kind: /** @type {'page'} */ ('page'),
         path,
-        badge: 'Recent'
+        badge: T('palette.badgeRecent')
       }))
     }
     const ranked = rankPagePaths(q, pageIndex, 10)
     const pageRows = ranked.map((r) => ({
       kind: /** @type {'page'} */ ('page'),
       path: r.path,
-      badge: 'Page'
+      badge: T('palette.badgePage')
     }))
     const blockRows = blockHits.slice(0, 18).map((h) => ({
       kind: /** @type {'block'} */ ('block'),
       hit: h,
-      badge: 'Block'
+      badge: T('palette.badgeBlock')
     }))
     return [...pageRows, ...blockRows]
   })()
@@ -186,25 +195,38 @@
 </script>
 
 {#if open}
-  <div class="palette-backdrop" role="presentation" tabindex="-1" on:click={onClose} on:keydown|stopPropagation></div>
-  <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div
+    class="palette-backdrop"
+    role="presentation"
+    tabindex="-1"
+    transition:fade={{ duration: 140 }}
+    on:click={onClose}
+    on:keydown|stopPropagation
+  ></div>
+  <div
+    class="palette"
+    role="dialog"
+    aria-modal="true"
+    aria-label={T('palette.aria')}
+    transition:fly={{ y: -10, duration: 220, easing: cubicOut }}
+  >
     <div class="palette-head">
-      <span class="kbd-hint"><kbd>↑</kbd><kbd>↓</kbd> navigate · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close</span>
+      <span class="kbd-hint">{T('palette.hint')}</span>
     </div>
     <input
       bind:this={inputEl}
       class="palette-input"
-      placeholder="Jump to page or search blocks…"
+      placeholder={T('palette.placeholder')}
       bind:value={query}
       on:keydown={onInputKeydown}
       autocomplete="off"
       spellcheck="false"
     />
     {#if indexLoading}
-      <div class="palette-status">Indexing pages…</div>
+      <div class="palette-status">{T('palette.indexingPages')}</div>
     {/if}
     {#if blocksLoading && query.trim()}
-      <div class="palette-status subtle">Searching blocks…</div>
+      <div class="palette-status subtle">{T('palette.searchingBlocks')}</div>
     {/if}
     {#if blockErr && query.trim()}
       <div class="palette-err">{blockErr}</div>
@@ -240,10 +262,21 @@
     </ul>
 
     {#if !indexLoading && rows.length === 0 && !query.trim()}
-      <div class="palette-empty">Open a page to build history — recents appear here.</div>
+      <div class="palette-empty palette-empty-rich">
+        <div class="pe-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="40" height="40"><path d="M14 20h20M14 28h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.35"/><circle cx="34" cy="16" r="3" fill="currentColor" opacity="0.15"/></svg>
+        </div>
+        <p class="pe-title">{T('palette.emptyRecents')}</p>
+      </div>
     {/if}
     {#if query.trim() && !blocksLoading && rows.length === 0 && !blockErr}
-      <div class="palette-empty">No matching pages or blocks</div>
+      <div class="palette-empty palette-empty-rich">
+        <div class="pe-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="40" height="40"><circle cx="22" cy="22" r="9" stroke="currentColor" stroke-width="2" fill="none" opacity="0.35"/><path d="M32 32l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.35"/></svg>
+        </div>
+        <p class="pe-title">{T('palette.emptySearchTitle')}</p>
+        <p class="pe-hint">{T('palette.emptySearchHint')}</p>
+      </div>
     {/if}
   </div>
 {/if}
@@ -281,13 +314,6 @@
     opacity: 0.45;
     letter-spacing: 0.02em;
   }
-  .kbd-hint kbd {
-    font-size: 0.65rem;
-    padding: 1px 4px;
-    border-radius: 3px;
-    border: 1px solid var(--dv-border, rgba(255, 255, 255, 0.12));
-    margin: 0 2px;
-  }
   .palette-input {
     width: 100%;
     box-sizing: border-box;
@@ -321,6 +347,31 @@
     font-size: 0.85rem;
     opacity: 0.5;
     padding: 8px 4px;
+  }
+  .palette-empty-rich {
+    text-align: center;
+    padding: 16px 12px;
+    opacity: 1;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--dv-fg) 4%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--dv-fg) 12%, transparent);
+  }
+  .pe-icon {
+    color: var(--dv-fg);
+    opacity: 0.5;
+    margin-bottom: 8px;
+  }
+  .pe-title {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 500;
+    opacity: 0.85;
+  }
+  .pe-hint {
+    margin: 8px 0 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    opacity: 0.55;
   }
   .hits {
     list-style: none;

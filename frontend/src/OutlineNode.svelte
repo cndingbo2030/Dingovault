@@ -438,9 +438,9 @@
     border: 1px solid var(--dv-border, rgba(255, 255, 255, 0.12));
     background: var(--dv-input, rgba(0, 0, 0, 0.2));
     color: inherit;
-    font-family: var(--dv-font, system-ui, sans-serif);
-    font-size: 0.95rem;
-    line-height: 1.45;
+    font-family: var(--dv-font-mono, 'JetBrains Mono', ui-monospace, monospace);
+    font-size: 0.92rem;
+    line-height: 1.5;
     touch-action: manipulation;
   }
   @media (max-width: 640px) {

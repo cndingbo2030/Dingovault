@@ -54,7 +54,7 @@ export function initImageFallback() {
 export function exposePluginAPI() {
   if (typeof window === 'undefined') return
   window.__DINGOVAULT__ = {
-    version: '1.0.0-gold',
+    version: '1.1.0-beta',
     registerToolbarButton,
     registerSidebarSection,
   }

@@ -1,5 +1,12 @@
 <script>
   import { GetBacklinks } from '../wailsjs/go/bridge/App.js'
+  import { messages, tr } from './lib/i18n/index.js'
+
+  $: L = $messages
+  /** @param {string} path @param {Record<string, string | number> | undefined} [vars] */
+  function T(path, vars) {
+    return tr(L, path, vars)
+  }
 
   /** @type {string} */
   export let notesRoot = ''
@@ -69,12 +76,18 @@
   }
 </script>
 
-<section class="backlinks" aria-label="Linked references">
-  <h2 class="title">Linked references</h2>
+<section class="backlinks" aria-label={T('backlinks.aria')}>
+  <h2 class="title">{T('backlinks.title')}</h2>
   {#if loading}
-    <p class="muted">Loading…</p>
+    <p class="muted">{T('backlinks.loading')}</p>
   {:else if items.length === 0}
-    <p class="muted">No other pages link here yet.</p>
+    <div class="bl-empty">
+      <div class="bl-empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 56 48" width="48" height="40"><path d="M12 16h32M12 26h22M12 36h28" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.3"/><path d="M38 12 L44 22 L32 22 Z" fill="currentColor" opacity="0.12"/></svg>
+      </div>
+      <p class="bl-empty-title">{T('backlinks.emptyTitle')}</p>
+      <p class="bl-hint">{T('backlinks.emptyHint')}</p>
+    </div>
   {:else}
     <ul class="list">
       {#each items as b (b.id)}
@@ -113,6 +126,30 @@
     margin: 0;
     font-size: 0.88rem;
     opacity: 0.5;
+  }
+  .bl-empty {
+    text-align: center;
+    padding: 12px 8px 8px;
+  }
+  .bl-empty-icon {
+    color: inherit;
+    opacity: 0.45;
+    margin-bottom: 6px;
+  }
+  .bl-empty-title {
+    margin: 0 0 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    opacity: 0.8;
+  }
+  .bl-hint {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    opacity: 0.5;
+    max-width: 40ch;
+    margin-left: auto;
+    margin-right: auto;
   }
   .list {
     list-style: none;

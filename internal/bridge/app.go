@@ -11,6 +11,7 @@ import (
 	"github.com/dingbo/dingovault/internal/domain"
 	"github.com/dingbo/dingovault/internal/export"
 	"github.com/dingbo/dingovault/internal/graph"
+	"github.com/dingbo/dingovault/internal/locale"
 	"github.com/dingbo/dingovault/internal/storage"
 	"github.com/dingbo/dingovault/internal/tenant"
 	"github.com/dingbo/dingovault/internal/version"
@@ -38,6 +39,44 @@ func (a *App) Startup(ctx context.Context) {
 	a.ctx = tenant.WithUserID(ctx, tenant.LocalUserID)
 }
 
+func (a *App) uiLocale() string {
+	c, err := config.Load()
+	if err != nil {
+		return "en"
+	}
+	return locale.Normalize(c.Locale)
+}
+
+func (a *App) t(key string) string {
+	return locale.Message(a.uiLocale(), key)
+}
+
+// GetLocale returns the persisted locale tag (e.g. en, zh-CN) or empty if never set (first run).
+func (a *App) GetLocale() (string, error) {
+	c, err := config.Load()
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(c.Locale) == "" {
+		return "", nil
+	}
+	return locale.Normalize(c.Locale), nil
+}
+
+// SetLocale persists UI language; only en and zh-CN are supported for now.
+func (a *App) SetLocale(tag string) error {
+	n := locale.Normalize(tag)
+	if !locale.Supported(n) {
+		return fmt.Errorf("%s", a.t(locale.ErrLocaleUnsupported))
+	}
+	c, err := config.Load()
+	if err != nil {
+		c = config.Default()
+	}
+	c.Locale = n
+	return config.Save(c)
+}
+
 // GetAppVersion returns the build version (set via -ldflags for release binaries).
 func (a *App) GetAppVersion() string {
 	return version.String
@@ -59,7 +98,7 @@ func (a *App) GetTheme() (string, error) {
 func (a *App) SetTheme(theme string) error {
 	theme = strings.ToLower(strings.TrimSpace(theme))
 	if theme != "light" && theme != "dark" {
-		return fmt.Errorf("theme must be light or dark")
+		return fmt.Errorf("%s", a.t(locale.ErrThemeInvalid))
 	}
 	c, err := config.Load()
 	if err != nil {
@@ -72,7 +111,7 @@ func (a *App) SetTheme(theme string) error {
 // SearchBlocks queries the FTS5 index (blocks_fts) and returns ranked hits with snippets.
 func (a *App) SearchBlocks(query string) ([]storage.BlockSearchHit, error) {
 	if a.store == nil {
-		return nil, fmt.Errorf("store not initialized")
+		return nil, fmt.Errorf("%s", a.t(locale.ErrStoreNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -84,7 +123,7 @@ func (a *App) SearchBlocks(query string) ([]storage.BlockSearchHit, error) {
 // ListVaultPages returns vault-relative .md paths for all indexed pages, most recently updated first.
 func (a *App) ListVaultPages() ([]string, error) {
 	if a.store == nil {
-		return nil, fmt.Errorf("store not initialized")
+		return nil, fmt.Errorf("%s", a.t(locale.ErrStoreNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -120,14 +159,14 @@ func (a *App) NotesRoot() string {
 // GetPage loads all blocks for a vault-relative or absolute Markdown path and returns a tree of roots.
 func (a *App) GetPage(path string) ([]PageBlock, error) {
 	if a.store == nil {
-		return nil, fmt.Errorf("store not initialized")
+		return nil, fmt.Errorf("%s", a.t(locale.ErrStoreNotInit))
 	}
 	abs, err := graph.ResolveVaultPath(a.notesRoot, path)
 	if err != nil {
-		return nil, fmt.Errorf("resolve path: %w", err)
+		return nil, fmt.Errorf("%s: %w", a.t(locale.ErrResolvePath), err)
 	}
 	if !strings.EqualFold(filepath.Ext(abs), ".md") {
-		return nil, fmt.Errorf("not a markdown path: %s", path)
+		return nil, fmt.Errorf("%s", a.t(locale.ErrNotMarkdown))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -144,7 +183,7 @@ func (a *App) GetPage(path string) ([]PageBlock, error) {
 	}
 	blocks, err := a.store.ListDomainBlocksBySourcePath(ctx, abs)
 	if err != nil {
-		return nil, fmt.Errorf("list blocks: %w", err)
+		return nil, fmt.Errorf("%s: %w", a.t(locale.ErrListBlocks), err)
 	}
 	return buildPageTree(blocks), nil
 }
@@ -152,7 +191,7 @@ func (a *App) GetPage(path string) ([]PageBlock, error) {
 // UpdateBlock surgically replaces the block's line span in the backing file and re-indexes.
 func (a *App) UpdateBlock(blockID, newContent string) error {
 	if a.graph == nil {
-		return fmt.Errorf("graph not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -164,7 +203,7 @@ func (a *App) UpdateBlock(blockID, newContent string) error {
 // InsertBlockAfter appends a new Markdown line after the given block (Logseq-style Enter).
 func (a *App) InsertBlockAfter(blockID, initialText string) error {
 	if a.graph == nil {
-		return fmt.Errorf("graph not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -176,7 +215,7 @@ func (a *App) InsertBlockAfter(blockID, initialText string) error {
 // ReorderBlockBefore moves movingID immediately before beforeID among sibling blocks in the same file.
 func (a *App) ReorderBlockBefore(movingID, beforeID string) error {
 	if a.graph == nil {
-		return fmt.Errorf("graph not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -188,10 +227,10 @@ func (a *App) ReorderBlockBefore(movingID, beforeID string) error {
 // GetWikiGraph returns indexed pages as nodes and resolved wikilinks as directed edges.
 func (a *App) GetWikiGraph() (storage.WikiGraph, error) {
 	if a.store == nil {
-		return storage.WikiGraph{}, fmt.Errorf("store not initialized")
+		return storage.WikiGraph{}, fmt.Errorf("%s", a.t(locale.ErrStoreNotInit))
 	}
 	if a.notesRoot == "" {
-		return storage.WikiGraph{}, fmt.Errorf("notes root not set")
+		return storage.WikiGraph{}, fmt.Errorf("%s", a.t(locale.ErrNotesRootNotSet))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -203,7 +242,7 @@ func (a *App) GetWikiGraph() (storage.WikiGraph, error) {
 // IndentBlock increases list indentation by two spaces for the block (and nested list lines under it).
 func (a *App) IndentBlock(blockID string) error {
 	if a.graph == nil {
-		return fmt.Errorf("graph not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -215,7 +254,7 @@ func (a *App) IndentBlock(blockID string) error {
 // OutdentBlock decreases list indentation by two spaces for the same span.
 func (a *App) OutdentBlock(blockID string) error {
 	if a.graph == nil {
-		return fmt.Errorf("graph not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -227,7 +266,7 @@ func (a *App) OutdentBlock(blockID string) error {
 // CycleBlockTodo cycles TODO → DOING → DONE → (clear) on the first line of the block in the file.
 func (a *App) CycleBlockTodo(blockID string) error {
 	if a.graph == nil {
-		return fmt.Errorf("graph not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -239,7 +278,7 @@ func (a *App) CycleBlockTodo(blockID string) error {
 // ApplySlashOp applies a slash command to the block: today, todo, h1, h2, h3, code.
 func (a *App) ApplySlashOp(blockID, op string) error {
 	if a.graph == nil {
-		return fmt.Errorf("graph not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -251,11 +290,11 @@ func (a *App) ApplySlashOp(blockID, op string) error {
 // EnsurePage creates path if missing (vault-relative or absolute under vault).
 func (a *App) EnsurePage(path string) error {
 	if a.graph == nil {
-		return fmt.Errorf("graph not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	abs, err := graph.ResolveVaultPath(a.notesRoot, path)
 	if err != nil {
-		return fmt.Errorf("resolve path: %w", err)
+		return fmt.Errorf("%s: %w", a.t(locale.ErrResolvePath), err)
 	}
 	if !strings.EqualFold(filepath.Ext(abs), ".md") {
 		abs += ".md"
@@ -270,10 +309,10 @@ func (a *App) EnsurePage(path string) error {
 // ResolveWikilink returns the absolute .md path for a [[wikilink]] target string.
 func (a *App) ResolveWikilink(target string) (string, error) {
 	if a.notesRoot == "" {
-		return "", fmt.Errorf("notes root not set")
+		return "", fmt.Errorf("%s", a.t(locale.ErrNotesRootNotSet))
 	}
 	if a.store == nil {
-		return "", fmt.Errorf("store not initialized")
+		return "", fmt.Errorf("%s", a.t(locale.ErrStoreNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -285,7 +324,7 @@ func (a *App) ResolveWikilink(target string) (string, error) {
 // ListPagesByProperty returns vault-relative .md paths whose YAML frontmatter has prop_key = prop_value (case-insensitive).
 func (a *App) ListPagesByProperty(key, value string) ([]string, error) {
 	if a.store == nil {
-		return nil, fmt.Errorf("store not initialized")
+		return nil, fmt.Errorf("%s", a.t(locale.ErrStoreNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -309,14 +348,14 @@ func (a *App) ListPagesByProperty(key, value string) ([]string, error) {
 // ExportPageHTML writes a standalone HTML file for a vault page using Goldmark. destPath should be absolute.
 func (a *App) ExportPageHTML(pagePath, destPath string) error {
 	if a.store == nil {
-		return fmt.Errorf("store not initialized")
+		return fmt.Errorf("%s", a.t(locale.ErrStoreNotInit))
 	}
 	if a.notesRoot == "" {
-		return fmt.Errorf("notes root not set")
+		return fmt.Errorf("%s", a.t(locale.ErrNotesRootNotSet))
 	}
 	abs, err := graph.ResolveVaultPath(a.notesRoot, pagePath)
 	if err != nil {
-		return fmt.Errorf("resolve path: %w", err)
+		return fmt.Errorf("%s: %w", a.t(locale.ErrResolvePath), err)
 	}
 	if !strings.EqualFold(filepath.Ext(abs), ".md") {
 		abs += ".md"
@@ -336,7 +375,7 @@ func (a *App) ExportPageHTML(pagePath, destPath string) error {
 	}
 	raw, err := os.ReadFile(abs)
 	if err != nil {
-		return fmt.Errorf("read page: %w", err)
+		return fmt.Errorf("%s: %w", a.t(locale.ErrReadPage), err)
 	}
 	title := strings.TrimSuffix(filepath.Base(abs), filepath.Ext(abs))
 	htmlBytes, err := export.MarkdownFileToStandaloneHTML(raw, title)
@@ -344,7 +383,7 @@ func (a *App) ExportPageHTML(pagePath, destPath string) error {
 		return err
 	}
 	if err := os.WriteFile(destPath, htmlBytes, 0o644); err != nil {
-		return fmt.Errorf("write export: %w", err)
+		return fmt.Errorf("%s: %w", a.t(locale.ErrWriteExport), err)
 	}
 	return nil
 }
@@ -352,7 +391,7 @@ func (a *App) ExportPageHTML(pagePath, destPath string) error {
 // GetBacklinks returns blocks (any page) whose content links to the given vault-relative page via [[wikilinks]].
 func (a *App) GetBacklinks(pagePath string) ([]domain.Block, error) {
 	if a.graph == nil {
-		return nil, fmt.Errorf("graph not initialized")
+		return nil, fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
@@ -364,7 +403,7 @@ func (a *App) GetBacklinks(pagePath string) ([]domain.Block, error) {
 // QueryBlocks runs a small query DSL: "key:value" for properties, otherwise FTS on content.
 func (a *App) QueryBlocks(dsl string) ([]domain.Block, error) {
 	if a.graph == nil {
-		return nil, fmt.Errorf("graph not initialized")
+		return nil, fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
 	ctx := context.Background()
 	if a.ctx != nil {
