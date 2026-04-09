@@ -7,6 +7,7 @@ English | [中文](README_zh.md)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
 [![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
 [![License](https://img.shields.io/github/license/cndingbo2030/dingovault)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
+<!-- badge-refresh-2026-04-09 -->
 
 **基于 Go 的高性能、本地优先大纲笔记系统，支持 SaaS 同步。**
 

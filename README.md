@@ -7,6 +7,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
 [![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
 [![License](https://img.shields.io/github/license/cndingbo2030/dingovault)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
+<!-- badge-refresh-2026-04-09 -->
 
 **High-performance, local-first outliner with SaaS sync, built in Go.**
 
