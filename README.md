@@ -6,6 +6,16 @@ Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikili
 
 ---
 
+## Maintainer & contact
+
+| | |
+|--|--|
+| **Maintainer** | **cndingbo2030** |
+| **Email** | **[cndingbo@outlook.com](mailto:cndingbo@outlook.com)** |
+| **Repository** | [github.com/cndingbo2030/Dingovault](https://github.com/cndingbo2030/Dingovault) |
+
+---
+
 ## Stack
 
 | Layer | Technology |
@@ -42,6 +52,23 @@ The **graph service** (`internal/graph`) and **Wails bridge** (`internal/bridge`
 - **Page load**: serving a page’s block tree from SQLite is usually **well under a millisecond** of database work (UI and disk I/O add latency on top).
 
 Exact numbers depend on hardware, vault size, and OS cache—run `make benchmark` on your machine for a reproducible report.
+
+---
+
+## Production hardening (SaaS)
+
+| Variable | Purpose |
+|----------|---------|
+| **`DINGO_ENV=production`** | Enables strict JWT rules: **`DINGO_JWT_SECRET` is required** and must **not** be the built-in development default. The Docker image sets this by default. |
+| **`DINGO_JWT_SECRET`** | HS256 signing key (minimum **16 characters**). Generate a long random string for production. |
+| **`ALLOWED_ORIGINS`** | Optional comma-separated **exact** browser origins allowed for CORS (e.g. `https://app.example.com,http://localhost:5173`). If unset, no `Access-Control-Allow-Origin` is sent (non-browser / same-origin clients unaffected). |
+
+### Health & metrics
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/v1/health` | Public | Liveness JSON `{"status":"ok"}`. |
+| `GET /api/v1/sys/stats` | **JWT** | Global index stats: `blockCount`, `pageCount`, `tenantCount` (distinct `user_id` in `blocks`; tenants with no blocks are not counted). |
 
 ---
 
@@ -88,9 +115,19 @@ Point `-notes` at your vault directory (saved in user config after first run).
 
 ### SaaS API server (CLI)
 
+**Development** (default dev JWT secret allowed):
+
 ```bash
-# Listens on :12030, isolated DB dingovault_saas.db in cwd unless you pass -db
 DINGO_SERVER=1 go run ./cmd/dingovault -db=./dingovault_saas.db
+```
+
+**Production** (strict secret):
+
+```bash
+export DINGO_ENV=production
+export DINGO_JWT_SECRET='your-unique-secret-at-least-16-chars'
+export ALLOWED_ORIGINS='https://your-spa.example.com'
+DINGO_PORT=12030 go run ./cmd/dingovault -server -db=./dingovault_saas.db
 ```
 
 Or only set **`DINGO_PORT`** (also enables HTTP):
@@ -99,20 +136,21 @@ Or only set **`DINGO_PORT`** (also enables HTTP):
 DINGO_PORT=12030 go run ./cmd/dingovault -server -db=./dingovault_saas.db
 ```
 
-Set a strong secret in production:
-
-```bash
-export DINGO_JWT_SECRET='at-least-16-chars-long'
-```
-
 ### Docker (SaaS image)
+
+The image sets **`DINGO_ENV=production`**; you **must** pass a real JWT secret at run time:
 
 ```bash
 make deploy-saas
-docker run --rm -p 12030:12030 -v dingovault-data:/data dingovault-saas:latest
+docker run --rm -p 12030:12030 \
+  -e DINGO_JWT_SECRET='your-unique-secret-at-least-16-chars' \
+  -e ALLOWED_ORIGINS='https://app.example.com' \
+  -v dingovault-data:/data \
+  dingovault-saas:latest
 ```
 
-Health check: `GET http://localhost:12030/api/v1/health`
+Health: `GET http://localhost:12030/api/v1/health`  
+Stats (JWT): `GET http://localhost:12030/api/v1/sys/stats`
 
 ---
 
@@ -132,18 +170,19 @@ Health check: `GET http://localhost:12030/api/v1/health`
 
 ## API overview (v1)
 
-Public: `GET /api/v1/health`, `POST /api/v1/auth/token`  
-Protected (`Authorization: Bearer …`): blocks, pages, search, backlinks, alias resolve, `POST /api/v1/pages/reindex` (markdown body), etc. See `internal/server/handlers.go`.
+**Public:** `GET /api/v1/health`, `POST /api/v1/auth/token`  
+
+**Protected** (`Authorization: Bearer …`): blocks, pages, search, backlinks, alias resolve, `POST /api/v1/pages/reindex`, **`GET /api/v1/sys/stats`**, etc. See `internal/server/handlers.go`.
 
 ---
 
-## Repository
+## Repository metadata
 
 Upstream: **[github.com/cndingbo2030/Dingovault](https://github.com/cndingbo2030/Dingovault)**  
-Project metadata: `project.meta.json`.
+Also see `project.meta.json`.
 
 ---
 
 ## License
 
-See repository files for license terms (add a `LICENSE` file if not yet present).
+This project is released under the **MIT License** — see [`LICENSE`](LICENSE).

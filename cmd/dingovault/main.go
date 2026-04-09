@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -83,9 +84,15 @@ func main() {
 		mux := http.NewServeMux()
 		server.MountAPI(mux, store, jwtSvc, graphSvc)
 
+		var handler http.Handler = mux
+		if o := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS")); o != "" {
+			handler = server.CORSMiddleware(o, mux)
+			log.Printf("CORS enabled (ALLOWED_ORIGINS=%q)", o)
+		}
+
 		httpSrv = &http.Server{
 			Addr:              ":" + port,
-			Handler:           mux,
+			Handler:           handler,
 			ReadHeaderTimeout: 10 * time.Second,
 		}
 		go func() {

@@ -13,7 +13,9 @@ RUN apk add --no-cache ca-certificates tzdata \
 	&& adduser -u 10001 -S -G dingovault -h /var/lib/dingovault dingovault
 USER dingovault:dingovault
 WORKDIR /var/lib/dingovault
+ENV DINGO_ENV=production
 ENV DINGO_PORT=12030
+# Required at runtime: -e DINGO_JWT_SECRET='your-unique-secret-at-least-16-chars'
 EXPOSE 12030
 VOLUME ["/data"]
 COPY --from=builder /out/dingovault /usr/local/bin/dingovault

@@ -38,6 +38,7 @@ func MountAPI(mux *http.ServeMux, store storage.Provider, j *auth.JWT, graphSvc 
 	if graphSvc != nil {
 		mux.Handle("POST /api/v1/pages/reindex", protected(http.HandlerFunc(handleReindexMarkdown(graphSvc))))
 	}
+	mux.Handle("GET /api/v1/sys/stats", protected(http.HandlerFunc(handleSysStats(store))))
 }
 
 type reindexBody struct {
@@ -82,6 +83,17 @@ func handleSearchFTS(store storage.Provider) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, hits)
+	}
+}
+
+func handleSysStats(store storage.Provider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		st, err := store.IndexStats(r.Context())
+		if err != nil {
+			http.Error(w, `{"error":"stats unavailable"}`, http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, st)
 	}
 }
 

@@ -290,6 +290,28 @@ func (r *RemoteStore) ReplaceIndexedSource(ctx context.Context, absSourcePath st
 	return err
 }
 
+func (r *RemoteStore) IndexStats(ctx context.Context) (IndexStats, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.baseURL+"/api/v1/sys/stats", nil)
+	if err != nil {
+		return IndexStats{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+r.token)
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return IndexStats{}, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return IndexStats{}, fmt.Errorf("remote sys/stats: %s: %s", resp.Status, strings.TrimSpace(string(raw)))
+	}
+	var st IndexStats
+	if err := json.Unmarshal(raw, &st); err != nil {
+		return IndexStats{}, err
+	}
+	return st, nil
+}
+
 func (r *RemoteStore) DeleteIndexedSource(ctx context.Context, absSourcePath string) error {
 	u := r.baseURL + "/api/v1/pages?sourcePath=" + url.QueryEscape(absSourcePath)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u, nil)

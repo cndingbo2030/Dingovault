@@ -32,6 +32,9 @@ type Provider interface {
 	// Writes — replace all indexed data for one markdown file, or remove it.
 	ReplaceIndexedSource(ctx context.Context, absSourcePath string, res parser.ParseResult, pageProps map[string]string, aliases []string) error
 	DeleteIndexedSource(ctx context.Context, absSourcePath string) error
+
+	// IndexStats returns global block/page/tenant counts (SaaS monitoring; all tenants).
+	IndexStats(ctx context.Context) (IndexStats, error)
 }
 
 // Compile-time check: local SQLite store satisfies Provider.

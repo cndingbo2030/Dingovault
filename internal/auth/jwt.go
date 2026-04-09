@@ -26,13 +26,23 @@ type JWT struct {
 }
 
 // NewJWTFromEnv builds a JWT helper using DINGO_JWT_SECRET (or dev default if allowDevDefault).
+// In production (DINGO_ENV=production), DINGO_JWT_SECRET must be set to a non-default value.
 func NewJWTFromEnv(issuer string, ttl time.Duration, allowDevDefault bool) (*JWT, error) {
-	sec := os.Getenv("DINGO_JWT_SECRET")
-	if sec == "" {
+	raw := strings.TrimSpace(os.Getenv("DINGO_JWT_SECRET"))
+	var sec string
+	if raw != "" {
+		sec = raw
+	} else {
+		if IsProduction() {
+			return nil, errors.New("DINGO_ENV=production requires DINGO_JWT_SECRET to be set")
+		}
 		if !allowDevDefault {
 			return nil, errors.New("DINGO_JWT_SECRET is required for SaaS API")
 		}
 		sec = DefaultDevSecret
+	}
+	if IsProduction() && sec == DefaultDevSecret {
+		return nil, errors.New("production: DINGO_JWT_SECRET must not equal the built-in development default; set a unique secret")
 	}
 	if len(sec) < 16 {
 		return nil, fmt.Errorf("DINGO_JWT_SECRET must be at least 16 bytes")
