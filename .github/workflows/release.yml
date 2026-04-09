@@ -47,13 +47,13 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: |
-          out="dingovault-server-${{ matrix.goos }}-${{ matrix.goarch }}"
+          out="dingovault-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
           if [ "${{ matrix.goos }}" = "windows" ]; then out="$out.exe"; fi
           go build -trimpath -ldflags="${GO_LDFLAGS}" -o "$out" ./cmd/dingovault
       - uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dingovault-server-*
+          path: dingovault-${{ github.ref_name }}-*
 
   wails-linux:
     needs: test
@@ -80,11 +80,11 @@ jobs:
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
           wails build -platform linux/amd64 -o dingovault -ldflags "${GO_LDFLAGS}"
       - name: Pack
-        run: tar -czvf dingovault-linux-amd64.tar.gz -C build/bin .
+        run: tar -czvf dingovault-${{ github.ref_name }}-linux-amd64.tar.gz -C build/bin .
       - uses: actions/upload-artifact@v4
         with:
           name: wails-linux-amd64
-          path: dingovault-linux-amd64.tar.gz
+          path: dingovault-${{ github.ref_name }}-linux-amd64.tar.gz
 
   wails-macos:
     needs: test
@@ -106,11 +106,11 @@ jobs:
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
           wails build -platform darwin/universal -o Dingovault -ldflags "${GO_LDFLAGS}"
       - name: Pack
-        run: cd build/bin && zip -r ../../dingovault-macos-universal.zip Dingovault.app
+        run: cd build/bin && zip -r ../../dingovault-${{ github.ref_name }}-macos-universal.zip Dingovault.app
       - uses: actions/upload-artifact@v4
         with:
           name: wails-macos-universal
-          path: dingovault-macos-universal.zip
+          path: dingovault-${{ github.ref_name }}-macos-universal.zip
 
   wails-windows:
     needs: test
@@ -178,7 +178,18 @@ jobs:
       - name: Flatten for upload
         run: |
           mkdir -p upload
-          find artifacts -type f \( -name 'dingovault-server*' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.exe' \) -exec cp {} upload/ \;
+          cp artifacts/server-linux-amd64/dingovault-${{ github.ref_name }}-linux-amd64 upload/
+          cp artifacts/server-windows-amd64/dingovault-${{ github.ref_name }}-windows-amd64.exe upload/
+          cp artifacts/server-darwin-amd64/dingovault-${{ github.ref_name }}-darwin-amd64 upload/
+          cp artifacts/server-darwin-arm64/dingovault-${{ github.ref_name }}-darwin-arm64 upload/
+          cp artifacts/wails-linux-amd64/dingovault-${{ github.ref_name }}-linux-amd64.tar.gz upload/
+          cp artifacts/wails-macos-universal/dingovault-${{ github.ref_name }}-macos-universal.zip upload/
+          cp artifacts/wails-windows-amd64/dingovault.exe upload/dingovault-${{ github.ref_name }}-windows-amd64-wails.exe
+
+      - name: Generate checksums
+        run: |
+          cd upload
+          shasum -a 256 * > sha256sums.txt
 
       - name: Write release body prefix (categorized changelog)
         env:

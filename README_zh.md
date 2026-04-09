@@ -2,9 +2,11 @@
 
 English | [中文](README_zh.md)
 
-[![Release](https://github.com/cndingbo2030/dingovault/actions/workflows/release.yml/badge.svg)](https://github.com/cndingbo2030/dingovault/actions)
+[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault)](https://github.com/cndingbo2030/dingovault/releases)
+[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
 [![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/github/license/cndingbo2030/dingovault)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
 
 **基于 Go 的高性能、本地优先大纲笔记系统，支持 SaaS 同步。**
 

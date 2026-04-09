@@ -1,17 +1,21 @@
 # Dingovault production builds (requires Wails CLI: https://wails.io)
-.PHONY: build release dev clean benchmark fmt lint-frontend dist dist-dmg deploy-saas
+.PHONY: build release release-server dev clean benchmark fmt lint-frontend dist dist-dmg deploy-saas
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 APP_VERSION ?= 1.1.0
 GO_LDFLAGS_X := -X github.com/cndingbo2030/dingovault/internal/version.String=$(APP_VERSION)
 DIST_ARCH ?= $(shell uname -m)
 DIST_BUNDLE = dingovault-$(VERSION)-darwin-$(DIST_ARCH)
+SERVER_BIN = dingovault-v$(APP_VERSION)-$(shell uname -s | tr '[:upper:]' '[:lower:]')-$(DIST_ARCH)
 
 build:
 	wails build -clean -ldflags="-s -w $(GO_LDFLAGS_X)"
 
 release:
 	wails build -clean -ldflags="-s -w $(GO_LDFLAGS_X)"
+
+release-server:
+	go build -trimpath -ldflags="-s -w $(GO_LDFLAGS_X)" -o $(SERVER_BIN) ./cmd/dingovault
 
 dev:
 	wails dev
