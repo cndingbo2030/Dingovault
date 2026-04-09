@@ -218,6 +218,21 @@ For **`/api/v1/capture`**, **`/api/v1/assets`**, and **`/api/v1/graph/wiki`**, r
 
 ---
 
+### macOS installation (Gatekeeper)
+
+If macOS shows a malware/untrusted developer warning for the downloaded app:
+
+1. Right-click `Dingovault.app` and choose **Open** (then confirm).
+2. If needed, clear quarantine metadata manually:
+
+```bash
+xattr -cr /Applications/Dingovault.app
+```
+
+This is expected for unsigned open-source app bundles.
+
+---
+
 ## Makefile targets
 
 | Target | Purpose |

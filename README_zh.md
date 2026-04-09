@@ -59,6 +59,19 @@ wails dev
 
 更多部署、SaaS、API 与发布流程，请阅读主文档 [README.md](README.md)。
 
+## macOS 安装提示（Gatekeeper）
+
+如果 macOS 提示应用来自未识别开发者或“可能包含恶意软件”：
+
+1. 对 `Dingovault.app` 右键，选择 **打开** 并确认。
+2. 如仍受阻，可执行：
+
+```bash
+xattr -cr /Applications/Dingovault.app
+```
+
+这是未进行 Apple 开发者签名的开源应用常见现象。
+
 ## 维护者
 
 - Maintainer: **cndingbo2030**

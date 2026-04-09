@@ -1,3 +1,4 @@
+// Package tenant carries per-request tenant/user identity through context.
 package tenant
 
 import "context"

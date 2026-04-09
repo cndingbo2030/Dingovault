@@ -51,6 +51,7 @@ jobs:
           out="dingovault-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
           if [ "${{ matrix.goos }}" = "windows" ]; then out="$out.exe"; fi
           go build -trimpath -ldflags="${GO_LDFLAGS}" -o "$out" ./cmd/dingovault
+          chmod +x "$out" || true
       - uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -112,7 +113,9 @@ jobs:
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
           wails build -platform darwin/${{ matrix.arch }} -o Dingovault -ldflags "${GO_LDFLAGS}"
       - name: Pack
-        run: cd build/bin && zip -r ../../dingovault-${{ github.ref_name }}-darwin-${{ matrix.arch }}.zip Dingovault.app
+        run: |
+          chmod +x build/bin/Dingovault.app/Contents/MacOS/Dingovault || true
+          cd build/bin && zip -r ../../dingovault-${{ github.ref_name }}-darwin-${{ matrix.arch }}.zip Dingovault.app
       - uses: actions/upload-artifact@v4
         with:
           name: wails-macos-${{ matrix.arch }}

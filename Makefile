@@ -10,9 +10,11 @@ SERVER_BIN = dingovault-v$(APP_VERSION)-$(shell uname -s | tr '[:upper:]' '[:low
 
 build:
 	wails build -clean -ldflags="-s -w $(GO_LDFLAGS_X)"
+	chmod +x build/bin/dingovault.app/Contents/MacOS/Dingovault || true
 
 release:
 	wails build -clean -ldflags="-s -w $(GO_LDFLAGS_X)"
+	chmod +x build/bin/dingovault.app/Contents/MacOS/Dingovault || true
 
 release-server:
 	go build -trimpath -ldflags="-s -w $(GO_LDFLAGS_X)" -o $(SERVER_BIN) ./cmd/dingovault

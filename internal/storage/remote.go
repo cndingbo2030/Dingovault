@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -70,7 +71,7 @@ func (r *RemoteStore) doJSON(ctx context.Context, method, path string, reqBody a
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp.Body)
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return resp.StatusCode, fmt.Errorf("remote %s %s: %s: %s", method, path, resp.Status, strings.TrimSpace(string(raw)))
@@ -95,7 +96,7 @@ func (r *RemoteStore) GetBlockByID(ctx context.Context, id string) (domain.Block
 	if err != nil {
 		return domain.Block{}, err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp.Body)
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if resp.StatusCode == http.StatusNotFound {
 		return domain.Block{}, fmt.Errorf("block not found: %s", id)
@@ -121,7 +122,7 @@ func (r *RemoteStore) ListDomainBlocksBySourcePath(ctx context.Context, sourcePa
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp.Body)
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("remote GET pages: %s: %s", resp.Status, strings.TrimSpace(string(raw)))
@@ -166,7 +167,7 @@ func (r *RemoteStore) ListSourcePathsByRecency(ctx context.Context, limit int) (
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp.Body)
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("remote paths/recent: %s: %s", resp.Status, strings.TrimSpace(string(raw)))
@@ -316,7 +317,7 @@ func (r *RemoteStore) IndexStats(ctx context.Context) (IndexStats, error) {
 	if err != nil {
 		return IndexStats{}, err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp.Body)
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return IndexStats{}, fmt.Errorf("remote sys/stats: %s: %s", resp.Status, strings.TrimSpace(string(raw)))
@@ -339,10 +340,19 @@ func (r *RemoteStore) DeleteIndexedSource(ctx context.Context, absSourcePath str
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp.Body)
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("remote DELETE pages: %s: %s", resp.Status, strings.TrimSpace(string(raw)))
 	}
 	return nil
+}
+
+func closeBody(c io.Closer) {
+	if c == nil {
+		return
+	}
+	if err := c.Close(); err != nil {
+		log.Printf("remote response close: %v", err)
+	}
 }

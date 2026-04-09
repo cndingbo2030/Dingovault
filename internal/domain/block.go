@@ -1,3 +1,4 @@
+// Package domain defines core Dingovault data models shared across layers.
 package domain
 
 import "time"

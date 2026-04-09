@@ -1,3 +1,4 @@
+// Package onboarding provisions first-run demo content for new users.
 package onboarding
 
 import (
@@ -8,6 +9,7 @@ import (
 	"strings"
 )
 
+// DemoBundleVersion tracks the embedded demo bundle format/materialization version.
 const DemoBundleVersion = "1"
 
 // EnsureDemoVaultFromFS extracts embedded demo-vault files into the user cache directory when
