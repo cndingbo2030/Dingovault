@@ -19,6 +19,16 @@
   export let onCycleTodo = async () => {}
   /** @type {(id: string, op: string) => Promise<void>} */
   export let onSlash = async () => {}
+  /** @type {Record<string, boolean>} */
+  export let collapsedMap = {}
+  /** @type {(id: string) => void} */
+  export let onToggleCollapse = () => {}
+  /** @type {string[]} */
+  export let selectedIds = []
+  /** @type {(id: string, selected: boolean) => void} */
+  export let onToggleSelect = () => {}
+  /** @type {(movingId: string, beforeId: string) => Promise<void>} */
+  export let onReorderBefore = async () => {}
 
   let local = node.content
   let saveTimer = 0
@@ -136,6 +146,43 @@
 
   const wikiRE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g
 
+  let dragOver = false
+
+  $: collapsed = !!collapsedMap[node.id]
+  $: selected = selectedIds.includes(node.id)
+  $: hasKids = !!(node.children && node.children.length)
+
+  /** @param {DragEvent} e */
+  function onDragStartRow(e) {
+    e.dataTransfer?.setData('application/x-dingovault-block', node.id)
+    e.dataTransfer?.setData('text/plain', node.id)
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+  }
+
+  /** @param {DragEvent} e */
+  function onDragOverRow(e) {
+    e.preventDefault()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+    dragOver = true
+  }
+
+  /** @param {DragEvent} e */
+  function onDragLeaveRow() {
+    dragOver = false
+  }
+
+  /** @param {DragEvent} e */
+  async function onDropRow(e) {
+    e.preventDefault()
+    dragOver = false
+    const moving =
+      e.dataTransfer?.getData('application/x-dingovault-block') ||
+      e.dataTransfer?.getData('text/plain') ||
+      ''
+    if (!moving || moving === node.id) return
+    await onReorderBefore(moving, node.id)
+  }
+
   /** @param {string} text */
   function wikiLinks(text) {
     /** @type {{ target: string, label: string }[]} */
@@ -153,9 +200,49 @@
 <div
   class="row"
   class:hasSlash={slashOpen}
+  class:dragOver
   style="--depth: {depth}; padding-left: {4 + depth * 14}px; border-left-width: {depth > 0 ? 1 : 0}px"
+  role="group"
+  on:dragover={onDragOverRow}
+  on:dragleave={onDragLeaveRow}
+  on:drop={onDropRow}
 >
-  <div class="edit">
+  <div class="row-inner">
+    <div class="row-controls" aria-hidden="false">
+      <label class="sel">
+        <input
+          type="checkbox"
+          checked={selected}
+          on:change={(e) =>
+            onToggleSelect(node.id, /** @type {HTMLInputElement} */ (e.target).checked)}
+        />
+      </label>
+      {#if hasKids}
+        <button
+          type="button"
+          class="fold"
+          title={collapsed ? 'Expand' : 'Collapse'}
+          aria-expanded={!collapsed}
+          on:click={() => onToggleCollapse(node.id)}
+        >
+          {collapsed ? '▸' : '▾'}
+        </button>
+      {:else}
+        <span class="fold-spacer"></span>
+      {/if}
+      <span
+        class="drag-handle"
+        draggable="true"
+        title="Drag to reorder (siblings)"
+        role="button"
+        tabindex="0"
+        on:dragstart={onDragStartRow}
+        on:keydown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') e.preventDefault()
+        }}
+      >⠿</span>
+    </div>
+    <div class="edit">
     <textarea
       bind:this={taEl}
       class="ta"
@@ -193,10 +280,11 @@
         {/each}
       </div>
     {/if}
+    </div>
   </div>
 </div>
-{#if node.children && node.children.length}
-  {#each node.children as child (child.id)}
+{#if hasKids && !collapsed}
+  {#each node.children || [] as child (child.id)}
     <svelte:self
       node={child}
       depth={depth + 1}
@@ -208,6 +296,11 @@
       {onOutdent}
       {onCycleTodo}
       {onSlash}
+      {collapsedMap}
+      {onToggleCollapse}
+      {selectedIds}
+      {onToggleSelect}
+      {onReorderBefore}
     />
   {/each}
 {/if}
@@ -217,9 +310,66 @@
     position: relative;
     margin-bottom: 8px;
     border-left: 0 solid var(--dv-rail, rgba(255, 255, 255, 0.08));
+    border-radius: 8px;
+    transition: background 0.12s ease;
+  }
+  .row.dragOver {
+    background: rgba(100, 140, 255, 0.08);
+  }
+  .row-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .row-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding-top: 6px;
+    flex-shrink: 0;
+    width: 28px;
+  }
+  .sel input {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: rgba(120, 140, 255, 0.9);
+  }
+  .fold {
+    border: none;
+    background: transparent;
+    color: var(--dv-muted, rgba(255, 255, 255, 0.45));
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1;
+    padding: 2px 0;
+    width: 22px;
+  }
+  .fold:hover {
+    color: var(--dv-fg, #fff);
+  }
+  .fold-spacer {
+    display: block;
+    width: 22px;
+    height: 14px;
+  }
+  .drag-handle {
+    cursor: grab;
+    font-size: 0.65rem;
+    line-height: 1;
+    letter-spacing: -0.12em;
+    opacity: 0.35;
+    user-select: none;
+    padding: 2px 0 4px;
+  }
+  .drag-handle:active {
+    cursor: grabbing;
   }
   .edit {
     position: relative;
+    flex: 1;
+    min-width: 0;
   }
   .ta {
     width: 100%;

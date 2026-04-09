@@ -69,6 +69,20 @@ Exact numbers depend on hardware, vault size, and OS cache—run `make benchmark
 |----------|------|-------------|
 | `GET /api/v1/health` | Public | Liveness JSON `{"status":"ok"}`. |
 | `GET /api/v1/sys/stats` | **JWT** | Global index stats: `blockCount`, `pageCount`, `tenantCount` (distinct `user_id` in `blocks`; tenants with no blocks are not counted). |
+| `POST /api/v1/capture` | **JWT** | Quick capture: JSON `{"text":"…","sourcePath":"Inbox.md"}` (default path `Inbox.md`). Appends a bullet under the vault page and reindexes. **Requires `-notes` / vault path on the server.** |
+| `POST /api/v1/assets` | **JWT** | Multipart form field **`file`**. Saves under **`assets/`** in the vault (png/jpg/gif/webp/svg/pdf). Returns `path`, `markdown` snippet, and `bytes`. **Requires vault path on the server.** |
+| `GET /api/v1/graph/wiki` | **JWT** | Page-level graph: `nodes` (`id` = absolute path, `label`) and `edges` (`source` → `target`) from resolved wikilinks. **Requires vault path** for alias resolution. |
+
+### Mobile / automation
+
+- **Siri Shortcuts / widgets**: `POST /api/v1/capture` with a Bearer token is enough to append to an inbox page without loading the block tree.
+- **CORS**: set `ALLOWED_ORIGINS` so browser-based or extension clients can call the API from your SPA origin.
+
+### Desktop UX (Phase 14)
+
+- **Fold**: parent blocks can be collapsed; state is stored in **`localStorage`** per page (`dingovault-collapse:<path>`), so large outlines stay manageable without changing Markdown yet.
+- **Drag ⋮⋮**: reorder **sibling** blocks (same parent) via the Wails binding **`ReorderBlockBefore`** (file-backed, same rules as indent/outdent).
+- **Graph** button: force-directed **page link graph** (resolved wikilinks) using **d3-force**.
 
 ---
 
@@ -152,6 +166,8 @@ docker run --rm -p 12030:12030 \
 Health: `GET http://localhost:12030/api/v1/health`  
 Stats (JWT): `GET http://localhost:12030/api/v1/sys/stats`
 
+For **`/api/v1/capture`**, **`/api/v1/assets`**, and **`/api/v1/graph/wiki`**, run the binary with **`-notes` / a mounted vault directory** (same as non-Docker SaaS). The stock Docker example is API-oriented; mount your Markdown tree and pass `-notes=/vault` (or extend the image entrypoint) if you need those routes.
+
 ---
 
 ## Makefile targets
@@ -172,7 +188,7 @@ Stats (JWT): `GET http://localhost:12030/api/v1/sys/stats`
 
 **Public:** `GET /api/v1/health`, `POST /api/v1/auth/token`  
 
-**Protected** (`Authorization: Bearer …`): blocks, pages, search, backlinks, alias resolve, `POST /api/v1/pages/reindex`, **`GET /api/v1/sys/stats`**, etc. See `internal/server/handlers.go`.
+**Protected** (`Authorization: Bearer …`): blocks, pages, search, backlinks, alias resolve, `POST /api/v1/pages/reindex`, **`GET /api/v1/sys/stats`**, **`POST /api/v1/capture`**, **`POST /api/v1/assets`**, **`GET /api/v1/graph/wiki`**, etc. See `internal/server/handlers.go` and `internal/server/phase14_handlers.go`.
 
 ---
 

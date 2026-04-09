@@ -35,6 +35,9 @@ type Provider interface {
 
 	// IndexStats returns global block/page/tenant counts (SaaS monitoring; all tenants).
 	IndexStats(ctx context.Context) (IndexStats, error)
+
+	// WikiGraph returns page nodes and resolved wikilink edges (requires vault root for alias resolution).
+	WikiGraph(ctx context.Context, vaultRoot string) (WikiGraph, error)
 }
 
 // Compile-time check: local SQLite store satisfies Provider.

@@ -17,6 +17,8 @@ export function GetBacklinks(arg1:string):Promise<Array<domain.Block>>;
 
 export function GetPage(arg1:string):Promise<Array<bridge.PageBlock>>;
 
+export function GetWikiGraph():Promise<storage.WikiGraph>;
+
 export function GetTheme():Promise<string>;
 
 export function IndentBlock(arg1:string):Promise<void>;
@@ -34,6 +36,8 @@ export function OutdentBlock(arg1:string):Promise<void>;
 export function QueryBlocks(arg1:string):Promise<Array<domain.Block>>;
 
 export function ResolveWikilink(arg1:string):Promise<string>;
+
+export function ReorderBlockBefore(arg1:string,arg2:string):Promise<void>;
 
 export function SearchBlocks(arg1:string):Promise<Array<storage.BlockSearchHit>>;
 

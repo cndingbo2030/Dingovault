@@ -25,10 +25,13 @@
     EnsurePage,
     ResolveWikilink,
     GetTheme,
-    SetTheme
+    SetTheme,
+    GetWikiGraph,
+    ReorderBlockBefore
   } from '../wailsjs/go/bridge/App.js'
   import { EventsOn } from '../wailsjs/runtime/runtime.js'
   import OutlineNode from './OutlineNode.svelte'
+  import PageGraph from './PageGraph.svelte'
   import Backlinks from './Backlinks.svelte'
   import CommandPalette from './CommandPalette.svelte'
   import ToastStack from './ToastStack.svelte'
@@ -43,6 +46,14 @@
   let err = ''
   let lastFileEvent = ''
   let indexEpoch = 0
+
+  /** @type {Record<string, boolean>} */
+  let collapsedState = {}
+  /** @type {string[]} */
+  let selectedIds = []
+  let graphOpen = false
+  /** @type {{ nodes: { id: string, label: string }[], edges: { source: string, target: string }[] }} */
+  let graphData = { nodes: [], edges: [] }
 
   /** @type {Record<string, number>} */
   let saveTimers = {}
@@ -67,6 +78,80 @@
   }
 
   $: breadcrumbSegments = pagePath.split('/').filter(Boolean)
+
+  function collapseStorageKey() {
+    return `dingovault-collapse:${pagePath}`
+  }
+
+  function loadCollapsedFromStorage() {
+    try {
+      const raw = localStorage.getItem(collapseStorageKey())
+      collapsedState = raw ? JSON.parse(raw) : {}
+    } catch {
+      collapsedState = {}
+    }
+  }
+
+  $: pagePath, loadCollapsedFromStorage()
+
+  function toggleCollapse(id) {
+    collapsedState = { ...collapsedState, [id]: !collapsedState[id] }
+    try {
+      localStorage.setItem(collapseStorageKey(), JSON.stringify(collapsedState))
+    } catch {
+      /* ignore quota */
+    }
+  }
+
+  /** @param {string} id @param {boolean} on */
+  function toggleSelect(id, on) {
+    if (on) {
+      if (!selectedIds.includes(id)) selectedIds = [...selectedIds, id]
+    } else {
+      selectedIds = selectedIds.filter((x) => x !== id)
+    }
+  }
+
+  function clearSelection() {
+    selectedIds = []
+  }
+
+  async function copySelectedMarkdown() {
+    const lines = []
+    for (const id of selectedIds) {
+      const el = document.querySelector(`textarea[data-block-id="${id}"]`)
+      if (el && el instanceof HTMLTextAreaElement) lines.push(el.value)
+    }
+    const text = lines.join('\n\n')
+    try {
+      await navigator.clipboard.writeText(text)
+      pushToast(`Copied ${lines.length} block(s)`, 'info')
+    } catch {
+      pushToast('Clipboard failed', 'error')
+    }
+  }
+
+  async function openGraph() {
+    err = ''
+    try {
+      graphData = await GetWikiGraph()
+      graphOpen = true
+    } catch (e) {
+      notifyErr(e)
+    }
+  }
+
+  /** @param {string} movingId @param {string} beforeId */
+  async function handleReorderBefore(movingId, beforeId) {
+    err = ''
+    try {
+      await syncAllBlocksFromDOM()
+      await ReorderBlockBefore(movingId, beforeId)
+      await loadPage(pagePath)
+    } catch (e) {
+      notifyErr(e)
+    }
+  }
 
   onMount(() => {
     document.documentElement.style.setProperty(
@@ -128,6 +213,7 @@
     try {
       roots = await GetPage(rel)
       pagePath = rel
+      selectedIds = []
       touchRecentPage(rel)
       if (focusId) {
         await tick()
@@ -333,7 +419,26 @@
     <button type="button" class="btn secondary" on:click={toggleTheme} title="Toggle light/dark">
       {theme === 'dark' ? 'Light' : 'Dark'} mode
     </button>
+    <button type="button" class="btn secondary" on:click={openGraph}>Graph</button>
   </div>
+
+  {#if selectedIds.length > 0}
+    <div class="bulk-bar" role="toolbar" aria-label="Multi-select">
+      <span class="bulk-count">{selectedIds.length} selected</span>
+      <button type="button" class="btn secondary sm" on:click={copySelectedMarkdown}>Copy text</button>
+      <button type="button" class="btn secondary sm" on:click={clearSelection}>Clear</button>
+    </div>
+  {/if}
+
+  {#if graphOpen}
+    <section class="graph-panel">
+      <div class="graph-head">
+        <h2>Page graph</h2>
+        <button type="button" class="btn secondary sm" on:click={() => (graphOpen = false)}>Close</button>
+      </div>
+      <PageGraph graph={graphData} />
+    </section>
+  {/if}
 
   {#if err}
     <p class="err">{err}</p>
@@ -356,6 +461,11 @@
           onOutdent={handleOutdent}
           onCycleTodo={handleCycleTodo}
           onSlash={handleSlash}
+          collapsedMap={collapsedState}
+          onToggleCollapse={toggleCollapse}
+          {selectedIds}
+          onToggleSelect={toggleSelect}
+          onReorderBefore={handleReorderBefore}
         />
       {/each}
     {/if}
@@ -365,7 +475,9 @@
 
   <p class="hint">
     <kbd>Ctrl</kbd>+<kbd>K</kbd> palette · <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> indent ·
-    <kbd>Cmd</kbd>+<kbd>Enter</kbd> TODO cycle · <kbd>/</kbd> commands · <kbd>Enter</kbd> at end adds sibling
+    <kbd>Cmd</kbd>+<kbd>Enter</kbd> TODO cycle · <kbd>/</kbd> commands · <kbd>Enter</kbd> at end adds sibling ·
+    drag <span class="hint-mono">⠿</span> to reorder siblings · fold <span class="hint-mono">▾</span> · checkboxes
+    multi-select
   </p>
 </main>
 
@@ -501,10 +613,56 @@
     opacity: 0.55;
     font-size: 0.9rem;
   }
+  .bulk-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(120, 160, 255, 0.25);
+    background: rgba(80, 120, 255, 0.08);
+    font-size: 0.85rem;
+  }
+  .bulk-count {
+    font-weight: 500;
+    margin-right: 4px;
+  }
+  .btn.sm {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+  }
+  .graph-panel {
+    margin-top: 16px;
+    padding: 14px 16px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-fg) 4%, transparent);
+  }
+  .graph-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .graph-head h2 {
+    margin: 0;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.55;
+  }
   .hint {
     margin-top: 24px;
     font-size: 0.8rem;
     opacity: 0.5;
+  }
+  .hint-mono {
+    font-family: ui-monospace, monospace;
+    font-size: 0.72rem;
+    opacity: 0.75;
   }
   kbd {
     font-size: 0.75rem;

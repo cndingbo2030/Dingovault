@@ -82,7 +82,7 @@ func main() {
 		}
 
 		mux := http.NewServeMux()
-		server.MountAPI(mux, store, jwtSvc, graphSvc)
+		server.MountAPI(mux, store, jwtSvc, graphSvc, strings.TrimSpace(notesPath))
 
 		var handler http.Handler = mux
 		if o := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS")); o != "" {

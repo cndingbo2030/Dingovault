@@ -167,6 +167,33 @@ func (a *App) InsertBlockAfter(blockID, initialText string) error {
 	return a.graph.InsertBlockAfter(ctx, blockID, initialText)
 }
 
+// ReorderBlockBefore moves movingID immediately before beforeID among sibling blocks in the same file.
+func (a *App) ReorderBlockBefore(movingID, beforeID string) error {
+	if a.graph == nil {
+		return fmt.Errorf("graph not initialized")
+	}
+	ctx := context.Background()
+	if a.ctx != nil {
+		ctx = a.ctx
+	}
+	return a.graph.ReorderSiblingBefore(ctx, movingID, beforeID)
+}
+
+// GetWikiGraph returns indexed pages as nodes and resolved wikilinks as directed edges.
+func (a *App) GetWikiGraph() (storage.WikiGraph, error) {
+	if a.store == nil {
+		return storage.WikiGraph{}, fmt.Errorf("store not initialized")
+	}
+	if a.notesRoot == "" {
+		return storage.WikiGraph{}, fmt.Errorf("notes root not set")
+	}
+	ctx := context.Background()
+	if a.ctx != nil {
+		ctx = a.ctx
+	}
+	return a.store.WikiGraph(ctx, a.notesRoot)
+}
+
 // IndentBlock increases list indentation by two spaces for the block (and nested list lines under it).
 func (a *App) IndentBlock(blockID string) error {
 	if a.graph == nil {

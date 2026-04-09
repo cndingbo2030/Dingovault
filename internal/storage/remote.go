@@ -290,6 +290,22 @@ func (r *RemoteStore) ReplaceIndexedSource(ctx context.Context, absSourcePath st
 	return err
 }
 
+func (r *RemoteStore) WikiGraph(ctx context.Context, vaultRoot string) (WikiGraph, error) {
+	_ = vaultRoot
+	var g WikiGraph
+	_, err := r.doJSON(ctx, http.MethodGet, "/api/v1/graph/wiki", nil, &g)
+	if err != nil {
+		return WikiGraph{}, err
+	}
+	if g.Nodes == nil {
+		g.Nodes = []WikiGraphNode{}
+	}
+	if g.Edges == nil {
+		g.Edges = []WikiGraphEdge{}
+	}
+	return g, nil
+}
+
 func (r *RemoteStore) IndexStats(ctx context.Context) (IndexStats, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.baseURL+"/api/v1/sys/stats", nil)
 	if err != nil {

@@ -26,6 +26,10 @@ export function GetPage(arg1) {
   return window['go']['bridge']['App']['GetPage'](arg1);
 }
 
+export function GetWikiGraph() {
+  return window['go']['bridge']['App']['GetWikiGraph']();
+}
+
 export function GetTheme() {
   return window['go']['bridge']['App']['GetTheme']();
 }
@@ -60,6 +64,10 @@ export function QueryBlocks(arg1) {
 
 export function ResolveWikilink(arg1) {
   return window['go']['bridge']['App']['ResolveWikilink'](arg1);
+}
+
+export function ReorderBlockBefore(arg1, arg2) {
+  return window['go']['bridge']['App']['ReorderBlockBefore'](arg1, arg2);
 }
 
 export function SearchBlocks(arg1) {
