@@ -13,6 +13,7 @@ import (
 	"github.com/dingbo/dingovault/internal/bus"
 	"github.com/dingbo/dingovault/internal/config"
 	"github.com/dingbo/dingovault/internal/graph"
+	"github.com/dingbo/dingovault/internal/onboarding"
 	"github.com/dingbo/dingovault/internal/parser"
 	"github.com/dingbo/dingovault/internal/scanner"
 	"github.com/dingbo/dingovault/internal/storage"
@@ -52,6 +53,17 @@ func main() {
 	notesPath := *notes
 	if notesPath == "" {
 		notesPath = cfg.VaultPath
+	}
+	if notesPath == "" && config.ShouldOpenBundledDemo(*notes, cfg) {
+		if os.Getenv("DINGO_NO_DEMO_VAULT") == "1" {
+			log.Fatal("no vault path: pass -notes, set vaultPath in config, or unset DINGO_NO_DEMO_VAULT to use the built-in Demo Vault")
+		}
+		demoDir, err := onboarding.EnsureDemoVaultFromFS(embeddedDemoVault, onboarding.DemoVaultRootName)
+		if err != nil {
+			log.Fatalf("demo vault: %v", err)
+		}
+		notesPath = demoDir
+		log.Printf("no vault configured — opening built-in Demo Vault at %s (use -notes for your own folder)", notesPath)
 	}
 	if notesPath == "" {
 		log.Fatal("set -notes to your vault directory (path is saved to config for next launch)")

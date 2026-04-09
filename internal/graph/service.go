@@ -89,6 +89,10 @@ func (s *Service) applyParseResult(ctx context.Context, abs string, res parser.P
 	if err := s.store.ReplaceIndexedSource(ctx, abs, res, pageProps, aliases); err != nil {
 		return err
 	}
+	s.publish(ctx, bus.TopicAfterBlockIndexed, bus.AfterBlockIndexedPayload{
+		SourcePath: abs,
+		BlockCount: len(res.Blocks),
+	})
 	s.publish(ctx, bus.TopicFileReindexed, bus.FileReindexedPayload{Path: abs})
 	return nil
 }

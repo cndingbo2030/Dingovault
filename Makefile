@@ -2,14 +2,16 @@
 .PHONY: build release dev clean benchmark fmt lint-frontend dist dist-dmg deploy-saas
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+APP_VERSION ?= 1.0.0-gold
+GO_LDFLAGS_X := -X github.com/dingbo/dingovault/internal/version.String=$(APP_VERSION)
 DIST_ARCH ?= $(shell uname -m)
 DIST_BUNDLE = dingovault-$(VERSION)-darwin-$(DIST_ARCH)
 
 build:
-	wails build -clean
+	wails build -clean -ldflags="-s -w $(GO_LDFLAGS_X)"
 
 release:
-	wails build -clean -ldflags="-s -w"
+	wails build -clean -ldflags="-s -w $(GO_LDFLAGS_X)"
 
 dev:
 	wails dev
@@ -19,6 +21,10 @@ clean:
 
 benchmark:
 	go run ./scripts/benchmark.go
+
+# Stress + integrity check with encrypted SQLite (DINGO_MASTER_KEY must be ≥16 chars).
+benchmark-encrypted:
+	DINGO_MASTER_KEY=dingovault-bench-encryption-key-min16 go run ./scripts/benchmark.go -files 12 -total 2400 -verify
 
 fmt:
 	go fmt ./...
@@ -32,6 +38,7 @@ dist: release
 	mkdir -p dist/$(DIST_BUNDLE)
 	cp -R build/bin/dingovault.app dist/$(DIST_BUNDLE)/
 	cp -R vaults/Dingovault-Help dist/$(DIST_BUNDLE)/Dingovault-Help
+	cp -R demo-vault dist/$(DIST_BUNDLE)/demo-vault
 	cd dist && rm -f $(DIST_BUNDLE).zip && zip -rq $(DIST_BUNDLE).zip $(DIST_BUNDLE)
 	@echo "Created dist/$(DIST_BUNDLE).zip"
 

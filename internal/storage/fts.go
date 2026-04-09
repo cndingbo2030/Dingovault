@@ -79,6 +79,7 @@ LIMIT ?`
 		); err != nil {
 			return nil, fmt.Errorf("scan fts row: %w", err)
 		}
+		h.Content = s.revealContent(h.Content)
 		h.ID = logicalBlockID(ctx, h.ID)
 		out = append(out, h)
 	}
@@ -183,6 +184,7 @@ LIMIT 1`
 	if err != nil {
 		return nil, err
 	}
+	r.Content = s.revealContent(r.Content)
 	return &r, nil
 }
 
@@ -240,6 +242,7 @@ ORDER BY line_start ASC, id ASC`
 		if err := rows.Scan(&r.ID, &r.ParentID, &r.Content, &r.SourcePath, &r.LineStart, &r.LineEnd, &r.OutlineLevel); err != nil {
 			return nil, fmt.Errorf("scan block: %w", err)
 		}
+		r.Content = s.revealContent(r.Content)
 		out = append(out, r)
 	}
 	return out, rows.Err()

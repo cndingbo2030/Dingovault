@@ -15,6 +15,8 @@ export function ExportPageHTML(arg1:string,arg2:string):Promise<void>;
 
 export function GetBacklinks(arg1:string):Promise<Array<domain.Block>>;
 
+export function GetAppVersion():Promise<string>;
+
 export function GetPage(arg1:string):Promise<Array<bridge.PageBlock>>;
 
 export function GetWikiGraph():Promise<storage.WikiGraph>;

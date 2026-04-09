@@ -55,6 +55,7 @@ FROM blocks WHERE id = ? AND user_id = ?`
 	}
 	b.Metadata.CreatedAt = time.Unix(created, 0).UTC()
 	b.Metadata.UpdatedAt = time.Unix(updated, 0).UTC()
+	b.Content = s.revealContent(b.Content)
 	return decodeBlock(ctx, b), nil
 }
 
@@ -106,6 +107,7 @@ ORDER BY line_start ASC, id ASC`
 		}
 		b.Metadata.CreatedAt = time.Unix(created, 0).UTC()
 		b.Metadata.UpdatedAt = time.Unix(updated, 0).UTC()
+		b.Content = s.revealContent(b.Content)
 		out = append(out, decodeBlock(ctx, b))
 	}
 	return out, rows.Err()

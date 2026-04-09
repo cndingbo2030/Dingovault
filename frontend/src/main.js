@@ -1,5 +1,9 @@
 import './style.css'
 import App from './App.svelte'
+import { exposePluginAPI, initImageFallback } from './pluginRegistry.js'
+
+exposePluginAPI()
+initImageFallback()
 
 const target = document.getElementById('app')
 if (!target) {

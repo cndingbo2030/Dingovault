@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/dingbo/dingovault/internal/auth"
+	"github.com/dingbo/dingovault/internal/blob"
 	"github.com/dingbo/dingovault/internal/graph"
 	"github.com/dingbo/dingovault/internal/storage"
 )
@@ -15,8 +16,9 @@ import (
 // MountAPI registers SaaS REST routes on mux. Public: /api/v1/health, /api/v1/auth/token.
 // All other /api/v1/* routes require Authorization: Bearer <JWT>.
 // If graphSvc is non-nil, POST /api/v1/pages/reindex is registered (markdown → index).
-// vaultRoot is the indexed notes directory (absolute). When empty, capture, assets, and graph return 503.
-func MountAPI(mux *http.ServeMux, store storage.Provider, j *auth.JWT, graphSvc *graph.Service, vaultRoot string) {
+// vaultRoot is the indexed notes directory (absolute). When empty, capture and graph return 503.
+// assets may use filesystem under vaultRoot or S3/MinIO via blobProv when non-nil.
+func MountAPI(mux *http.ServeMux, store storage.Provider, j *auth.JWT, graphSvc *graph.Service, vaultRoot string, assets blob.Provider) {
 	mux.HandleFunc("GET /api/v1/health", handleHealth)
 	mux.HandleFunc("POST /api/v1/auth/token", handleAuthToken(j))
 
@@ -40,8 +42,8 @@ func MountAPI(mux *http.ServeMux, store storage.Provider, j *auth.JWT, graphSvc 
 		mux.Handle("POST /api/v1/pages/reindex", protected(http.HandlerFunc(handleReindexMarkdown(graphSvc))))
 		mux.Handle("POST /api/v1/capture", protected(http.HandlerFunc(handleCapture(graphSvc, vaultRoot))))
 	}
-	if strings.TrimSpace(vaultRoot) != "" {
-		mux.Handle("POST /api/v1/assets", protected(http.HandlerFunc(handleAssetUpload(vaultRoot))))
+	if assets != nil {
+		mux.Handle("POST /api/v1/assets", protected(http.HandlerFunc(handleAssetUpload(assets))))
 	}
 	mux.Handle("GET /api/v1/sys/stats", protected(http.HandlerFunc(handleSysStats(store))))
 	mux.Handle("GET /api/v1/graph/wiki", protected(http.HandlerFunc(handleWikiGraph(store, vaultRoot))))

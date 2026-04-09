@@ -22,6 +22,10 @@ export function GetBacklinks(arg1) {
   return window['go']['bridge']['App']['GetBacklinks'](arg1);
 }
 
+export function GetAppVersion() {
+  return window['go']['bridge']['App']['GetAppVersion']();
+}
+
 export function GetPage(arg1) {
   return window['go']['bridge']['App']['GetPage'](arg1);
 }

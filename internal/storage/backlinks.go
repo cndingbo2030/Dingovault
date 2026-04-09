@@ -53,7 +53,7 @@ ORDER BY b.source_path ASC, b.line_start ASC, b.id ASC`, placeholders)
 	}
 	defer rows.Close()
 
-	blocks, err := scanBlockRows(rows)
+	blocks, err := s.scanBlockRows(rows)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ ORDER BY b.source_path ASC, b.line_start ASC, b.id ASC`, placeholders)
 	return blocks, nil
 }
 
-func scanBlockRows(rows *sql.Rows) ([]domain.Block, error) {
+func (s *Store) scanBlockRows(rows *sql.Rows) ([]domain.Block, error) {
 	var out []domain.Block
 	for rows.Next() {
 		var b domain.Block
@@ -97,6 +97,7 @@ func scanBlockRows(rows *sql.Rows) ([]domain.Block, error) {
 		}
 		b.Metadata.CreatedAt = time.Unix(created, 0).UTC()
 		b.Metadata.UpdatedAt = time.Unix(updated, 0).UTC()
+		b.Content = s.revealContent(b.Content)
 		out = append(out, b)
 	}
 	return out, rows.Err()

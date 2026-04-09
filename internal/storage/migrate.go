@@ -6,8 +6,64 @@ import (
 	"fmt"
 )
 
-// MigrateMultiTenant upgrades legacy schemas to include user_id tenant columns and indexes.
-func MigrateMultiTenant(ctx context.Context, db *sql.DB) error {
+// CurrentSchemaVersion is the PRAGMA user_version Dingovault expects after all migrations run.
+// Increment when adding a new migration step in RunSchemaMigrations.
+const CurrentSchemaVersion = 2
+
+// ReadUserVersion returns SQLite PRAGMA user_version.
+func ReadUserVersion(ctx context.Context, db *sql.DB) (int, error) {
+	var v int
+	if err := db.QueryRowContext(ctx, `PRAGMA user_version`).Scan(&v); err != nil {
+		return 0, fmt.Errorf("read user_version: %w", err)
+	}
+	return v, nil
+}
+
+// WriteUserVersion sets PRAGMA user_version (must match migration progress).
+func WriteUserVersion(ctx context.Context, db *sql.DB, v int) error {
+	if v < 0 {
+		return fmt.Errorf("invalid user_version %d", v)
+	}
+	// user_version is an integer pragma; value is not user-controlled SQL.
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", v)); err != nil {
+		return fmt.Errorf("write user_version: %w", err)
+	}
+	return nil
+}
+
+// RunSchemaMigrations applies incremental migrations from PRAGMA user_version to CurrentSchemaVersion.
+// Safe on fresh DBs (version 0) and on legacy DBs created before versioning.
+func RunSchemaMigrations(ctx context.Context, db *sql.DB) error {
+	v, err := ReadUserVersion(ctx, db)
+	if err != nil {
+		return err
+	}
+	if v > CurrentSchemaVersion {
+		return fmt.Errorf("database schema newer than this binary (user_version=%d, app supports up to %d) — upgrade Dingovault", v, CurrentSchemaVersion)
+	}
+	for v < CurrentSchemaVersion {
+		switch v {
+		case 0:
+			if err := migrateV0ToV1(ctx, db); err != nil {
+				return fmt.Errorf("migrate 0→1: %w", err)
+			}
+		case 1:
+			if err := migrateV1ToV2(ctx, db); err != nil {
+				return fmt.Errorf("migrate 1→2: %w", err)
+			}
+		default:
+			return fmt.Errorf("internal error: unhandled schema step from version %d", v)
+		}
+		v++
+		if err := WriteUserVersion(ctx, db, v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// migrateV0ToV1 adds multi-tenant columns/tables for legacy databases (idempotent on modern DDL).
+func migrateV0ToV1(ctx context.Context, db *sql.DB) error {
 	if err := migrateBlocksUserID(ctx, db); err != nil {
 		return err
 	}
@@ -18,6 +74,25 @@ func MigrateMultiTenant(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	return ensureIndexes(ctx, db)
+}
+
+// migrateV1ToV2 reserved for forward-compatible metadata (plugins, feature flags, etc.).
+func migrateV1ToV2(ctx context.Context, db *sql.DB) error {
+	_, err := db.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS dingovault_meta (
+	k TEXT PRIMARY KEY NOT NULL,
+	v TEXT NOT NULL
+)`)
+	if err != nil {
+		return fmt.Errorf("dingovault_meta: %w", err)
+	}
+	return nil
+}
+
+// MigrateMultiTenant upgrades legacy schemas to include user_id tenant columns and indexes.
+// Deprecated: use RunSchemaMigrations; kept as a thin wrapper for tests and external callers.
+func MigrateMultiTenant(ctx context.Context, db *sql.DB) error {
+	return migrateV0ToV1(ctx, db)
 }
 
 func migrateBlocksUserID(ctx context.Context, db *sql.DB) error {

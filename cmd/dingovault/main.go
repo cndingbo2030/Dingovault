@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dingbo/dingovault/internal/auth"
+	"github.com/dingbo/dingovault/internal/blob"
 	"github.com/dingbo/dingovault/internal/bus"
 	"github.com/dingbo/dingovault/internal/config"
 	"github.com/dingbo/dingovault/internal/graph"
@@ -67,6 +68,15 @@ func main() {
 	graphSvc.SetBus(bus.New())
 
 	var httpSrv *http.Server
+	blobCtx := context.Background()
+	assetBlobs, err := blob.NewProviderFromEnv(blobCtx, strings.TrimSpace(notesPath))
+	if err != nil {
+		log.Fatalf("asset blob storage: %v", err)
+	}
+	if assetBlobs != nil {
+		log.Printf("asset uploads: blob backend active")
+	}
+
 	if httpMode {
 		port := os.Getenv("DINGO_PORT")
 		if port == "" {
@@ -82,7 +92,7 @@ func main() {
 		}
 
 		mux := http.NewServeMux()
-		server.MountAPI(mux, store, jwtSvc, graphSvc, strings.TrimSpace(notesPath))
+		server.MountAPI(mux, store, jwtSvc, graphSvc, strings.TrimSpace(notesPath), assetBlobs)
 
 		var handler http.Handler = mux
 		if o := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS")); o != "" {

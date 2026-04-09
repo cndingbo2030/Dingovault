@@ -2,13 +2,13 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/dingbo/dingovault/internal/auth"
+	"github.com/dingbo/dingovault/internal/blob"
 	"github.com/dingbo/dingovault/internal/graph"
 	"github.com/dingbo/dingovault/internal/storage"
 )
@@ -88,10 +88,10 @@ var allowedAssetExt = map[string]struct{}{
 	".png": {}, ".jpg": {}, ".jpeg": {}, ".gif": {}, ".webp": {}, ".svg": {}, ".pdf": {},
 }
 
-func handleAssetUpload(vaultRoot string) http.HandlerFunc {
+func handleAssetUpload(p blob.Provider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if vaultRoot == "" {
-			http.Error(w, `{"error":"upload requires vault path"}`, http.StatusServiceUnavailable)
+		if p == nil {
+			http.Error(w, `{"error":"asset storage not configured (set vault path or S3 env)"}`, http.StatusServiceUnavailable)
 			return
 		}
 		if err := r.ParseMultipartForm(maxAssetUpload); err != nil {
@@ -105,70 +105,35 @@ func handleAssetUpload(vaultRoot string) http.HandlerFunc {
 		}
 		defer func() { _ = file.Close() }()
 
-		name := safeAssetFilename(hdr.Filename)
+		name := blob.SafePublicFileName(hdr.Filename)
 		ext := strings.ToLower(filepath.Ext(name))
 		if _, ok := allowedAssetExt[ext]; !ok {
 			http.Error(w, `{"error":"unsupported file type"}`, http.StatusBadRequest)
 			return
 		}
 
-		destDir := filepath.Join(vaultRoot, "assets")
-		if err := os.MkdirAll(destDir, 0o755); err != nil {
-			http.Error(w, `{"error":"cannot create assets dir"}`, http.StatusInternalServerError)
-			return
+		tenant := ""
+		if c, ok := auth.ClaimsFromContext(r.Context()); ok && c != nil {
+			tenant = strings.TrimSpace(c.Subject)
 		}
-		dest := filepath.Join(destDir, name)
-		dst, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+
+		ct := hdr.Header.Get("Content-Type")
+		res, err := p.Put(r.Context(), blob.PutInput{
+			FileName:    name,
+			Body:        file,
+			Limit:       maxAssetUpload,
+			ContentType: ct,
+			TenantID:    tenant,
+		})
 		if err != nil {
-			http.Error(w, `{"error":"cannot write file (exists or permission)"}`, http.StatusInternalServerError)
-			return
-		}
-		n, err := io.Copy(dst, io.LimitReader(file, maxAssetUpload))
-		_ = dst.Close()
-		if err != nil {
-			_ = os.Remove(dest)
-			http.Error(w, `{"error":"save failed"}`, http.StatusInternalServerError)
-			return
-		}
-		if n == 0 {
-			_ = os.Remove(dest)
-			http.Error(w, `{"error":"empty file"}`, http.StatusBadRequest)
+			http.Error(w, `{"error":`+jsonString(err.Error())+`}`, http.StatusInternalServerError)
 			return
 		}
 
-		rel := "assets/" + filepath.ToSlash(name)
-		md := assetMarkdownLink(rel, name, ext)
 		writeJSON(w, map[string]any{
-			"path":     rel,
-			"markdown": md,
-			"bytes":    n,
+			"path":     res.Ref,
+			"markdown": res.Markdown,
+			"bytes":    res.Bytes,
 		})
 	}
-}
-
-func safeAssetFilename(name string) string {
-	base := filepath.Base(name)
-	base = strings.ReplaceAll(base, "..", "_")
-	base = strings.TrimSpace(base)
-	if base == "" || base == "." {
-		return "upload.bin"
-	}
-	return base
-}
-
-func assetMarkdownLink(rel, filename, ext string) string {
-	switch ext {
-	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg":
-		return fmt.Sprintf("![%s](%s)", linkTitle(filename), rel)
-	default:
-		return fmt.Sprintf("[%s](%s)", linkTitle(filename), rel)
-	}
-}
-
-func linkTitle(filename string) string {
-	t := strings.TrimSuffix(filename, filepath.Ext(filename))
-	if t == "" {
-		return "file"
-	}
-	return t
 }

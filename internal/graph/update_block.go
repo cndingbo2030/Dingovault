@@ -18,6 +18,17 @@ func (s *Service) UpdateBlock(ctx context.Context, blockID, newContent string) e
 		return fmt.Errorf("lookup block: %w", err)
 	}
 	path := b.Metadata.SourcePath
+	if s.bus != nil {
+		nc, err := s.bus.BeforeBlockSave(ctx, bus.BeforeBlockSaveData{
+			BlockID:    blockID,
+			SourcePath: path,
+			Content:    newContent,
+		})
+		if err != nil {
+			return fmt.Errorf("before:block:save hook: %w", err)
+		}
+		newContent = nc
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read file: %w", err)

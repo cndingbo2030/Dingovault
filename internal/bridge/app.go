@@ -13,6 +13,7 @@ import (
 	"github.com/dingbo/dingovault/internal/graph"
 	"github.com/dingbo/dingovault/internal/storage"
 	"github.com/dingbo/dingovault/internal/tenant"
+	"github.com/dingbo/dingovault/internal/version"
 )
 
 // App is the Wails-facing API surface (bound to the frontend).
@@ -35,6 +36,11 @@ func NewApp(store storage.Provider, g *graph.Service, notesRoot string) *App {
 // Startup is called by Wails on init; ctx is used for runtime events later.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = tenant.WithUserID(ctx, tenant.LocalUserID)
+}
+
+// GetAppVersion returns the build version (set via -ldflags for release binaries).
+func (a *App) GetAppVersion() string {
+	return version.String
 }
 
 // GetTheme returns persisted UI theme: "dark" or "light".

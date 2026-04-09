@@ -48,12 +48,16 @@ INSERT INTO blocks (
 				}
 				props = string(raw)
 			}
+			content, cErr := s.sealContent(b.Content)
+			if cErr != nil {
+				return fmt.Errorf("seal content: %w", cErr)
+			}
 			parent := sql.NullString{String: b.ParentID, Valid: b.ParentID != ""}
 			if _, err := tx.ExecContext(ctx, insBlock,
 				b.ID,
 				uid,
 				parent,
-				b.Content,
+				content,
 				props,
 				absSourcePath,
 				b.Metadata.LineStart,

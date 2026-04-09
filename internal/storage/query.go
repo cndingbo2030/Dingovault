@@ -38,7 +38,7 @@ ORDER BY source_path ASC, line_start ASC`
 		return nil, fmt.Errorf("property query: %w", err)
 	}
 	defer rows.Close()
-	blocks, err := scanBlockRows(rows)
+	blocks, err := s.scanBlockRows(rows)
 	if err != nil {
 		return nil, err
 	}

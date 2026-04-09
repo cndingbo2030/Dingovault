@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const appDirName = "dingovault"
@@ -84,6 +85,12 @@ func Load() (Config, error) {
 		c.Theme = "dark"
 	}
 	return c, nil
+}
+
+// ShouldOpenBundledDemo is true when no vault was passed on the CLI and none is saved in config.
+// The desktop app uses this to materialize the built-in Demo Vault for first-time onboarding.
+func ShouldOpenBundledDemo(notesCLI string, c Config) bool {
+	return strings.TrimSpace(notesCLI) == "" && strings.TrimSpace(c.VaultPath) == ""
 }
 
 // Save writes config atomically (write temp + rename in same dir).

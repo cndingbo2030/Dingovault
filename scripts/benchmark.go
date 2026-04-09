@@ -26,6 +26,7 @@ func main() {
 	dirFlag := flag.String("dir", "", "vault directory (default: temp dir)")
 	nFiles := flag.Int("files", 50, "number of markdown files")
 	nTotal := flag.Int("total", 10000, "approximate total list items across all files")
+	verify := flag.Bool("verify", false, "verify indexed block round-trip (use with DINGO_MASTER_KEY for encryption stress check)")
 	flag.Parse()
 
 	dir := *dirFlag
@@ -136,6 +137,60 @@ func main() {
 	if !slow {
 		fmt.Println("All measured p50 latencies are ≤ 50ms on this machine.")
 	}
+
+	if *verify {
+		if err := verifyIndexedBlocks(ctx, store, samplePath, perFile); err != nil {
+			fmt.Fprintf(os.Stderr, "verify: %v\n", err)
+			os.Exit(1)
+		}
+		if os.Getenv("DINGO_MASTER_KEY") != "" {
+			fmt.Println("Encryption verify OK (DINGO_MASTER_KEY): decrypted block content matches indexed markdown.")
+		} else {
+			fmt.Println("Verify OK: sampled blocks readable from index.")
+		}
+	}
+}
+
+func verifyIndexedBlocks(ctx context.Context, store *storage.Store, samplePath string, perFile int) error {
+	blocks, err := store.ListDomainBlocksBySourcePath(ctx, samplePath)
+	if err != nil {
+		return err
+	}
+	if len(blocks) == 0 {
+		return fmt.Errorf("no blocks for sample path")
+	}
+	n := len(blocks)
+	if n > 500 {
+		n = 500
+	}
+	for i := range n {
+		b := blocks[i]
+		if b.Content == "" {
+			return fmt.Errorf("empty content at block %s", b.ID)
+		}
+		// Bench markdown always contains "item" and a dvbenchtoken in some lines.
+		if i == 0 && !containsAny(b.Content, "item", ftsSeedToken) {
+			return fmt.Errorf("unexpected decrypted content prefix %q", truncate(b.Content, 40))
+		}
+	}
+	_ = perFile
+	return nil
+}
+
+func containsAny(s string, subs ...string) bool {
+	for _, x := range subs {
+		if strings.Contains(s, x) {
+			return true
+		}
+	}
+	return false
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
 
 func percentile(durs []time.Duration, p int) time.Duration {

@@ -29,6 +29,10 @@
   export let onToggleSelect = () => {}
   /** @type {(movingId: string, beforeId: string) => Promise<void>} */
   export let onReorderBefore = async () => {}
+  /** Mobile: swipe left on rail — cycle TODO */
+  export let onSwipeTodo = async () => {}
+  /** Mobile: swipe right on rail — clear block (confirm in parent) */
+  export let onSwipeClear = async () => {}
 
   let local = node.content
   let saveTimer = 0
@@ -183,6 +187,27 @@
     await onReorderBefore(moving, node.id)
   }
 
+  let swipeStartX = 0
+  let swipeStartY = 0
+
+  /** @param {TouchEvent} e */
+  function onTouchStartSwipe(e) {
+    if (e.touches.length !== 1) return
+    swipeStartX = e.touches[0].clientX
+    swipeStartY = e.touches[0].clientY
+  }
+
+  /** @param {TouchEvent} e */
+  async function onTouchEndSwipe(e) {
+    if (e.changedTouches.length !== 1) return
+    const dx = e.changedTouches[0].clientX - swipeStartX
+    const dy = e.changedTouches[0].clientY - swipeStartY
+    const min = 52
+    if (Math.abs(dx) < min || Math.abs(dx) < Math.abs(dy) * 1.2) return
+    if (dx < 0) await onSwipeTodo(node.id)
+    else await onSwipeClear(node.id)
+  }
+
   /** @param {string} text */
   function wikiLinks(text) {
     /** @type {{ target: string, label: string }[]} */
@@ -208,7 +233,12 @@
   on:drop={onDropRow}
 >
   <div class="row-inner">
-    <div class="row-controls" aria-hidden="false">
+    <div
+      class="row-controls touch-actions"
+      aria-hidden="false"
+      on:touchstart|passive={onTouchStartSwipe}
+      on:touchend|passive={onTouchEndSwipe}
+    >
       <label class="sel">
         <input
           type="checkbox"
@@ -301,6 +331,8 @@
       {selectedIds}
       {onToggleSelect}
       {onReorderBefore}
+      {onSwipeTodo}
+      {onSwipeClear}
     />
   {/each}
 {/if}
@@ -329,6 +361,32 @@
     padding-top: 6px;
     flex-shrink: 0;
     width: 28px;
+    touch-action: pan-y;
+  }
+  @media (max-width: 640px) {
+    .row-controls {
+      width: 40px;
+      min-height: 44px;
+      padding-top: 8px;
+      gap: 4px;
+    }
+    .sel input {
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      min-height: 20px;
+    }
+    .fold,
+    .fold-spacer {
+      width: 32px;
+      min-height: 28px;
+      font-size: 0.9rem;
+    }
+    .drag-handle {
+      font-size: 0.85rem;
+      padding: 6px 0 8px;
+      opacity: 0.5;
+    }
   }
   .sel input {
     width: 14px;
@@ -383,6 +441,14 @@
     font-family: var(--dv-font, system-ui, sans-serif);
     font-size: 0.95rem;
     line-height: 1.45;
+    touch-action: manipulation;
+  }
+  @media (max-width: 640px) {
+    .ta {
+      font-size: 16px;
+      min-height: 3rem;
+      padding: 10px 12px;
+    }
   }
   .ta:focus {
     outline: none;

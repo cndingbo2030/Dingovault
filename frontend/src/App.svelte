@@ -27,7 +27,8 @@
     GetTheme,
     SetTheme,
     GetWikiGraph,
-    ReorderBlockBefore
+    ReorderBlockBefore,
+    GetAppVersion
   } from '../wailsjs/go/bridge/App.js'
   import { EventsOn } from '../wailsjs/runtime/runtime.js'
   import OutlineNode from './OutlineNode.svelte'
@@ -37,6 +38,7 @@
   import ToastStack from './ToastStack.svelte'
   import { touchRecentPage } from './recentPages.js'
   import { pushToast } from './toastStore.js'
+  import { toolbarEntries, sidebarEntries } from './pluginRegistry.js'
 
   let notesRoot = ''
   let pagePath = 'README.md'
@@ -52,6 +54,9 @@
   /** @type {string[]} */
   let selectedIds = []
   let graphOpen = false
+  let aboutOpen = false
+  /** @type {string} */
+  let appVersion = ''
   /** @type {{ nodes: { id: string, label: string }[], edges: { source: string, target: string }[] }} */
   let graphData = { nodes: [], edges: [] }
 
@@ -141,6 +146,16 @@
     }
   }
 
+  async function openAbout() {
+    err = ''
+    try {
+      appVersion = await GetAppVersion()
+    } catch {
+      appVersion = ''
+    }
+    aboutOpen = true
+  }
+
   /** @param {string} movingId @param {string} beforeId */
   async function handleReorderBefore(movingId, beforeId) {
     err = ''
@@ -148,6 +163,31 @@
       await syncAllBlocksFromDOM()
       await ReorderBlockBefore(movingId, beforeId)
       await loadPage(pagePath)
+    } catch (e) {
+      notifyErr(e)
+    }
+  }
+
+  /** @param {string} id */
+  async function handleSwipeTodo(id) {
+    err = ''
+    try {
+      await syncAllBlocksFromDOM()
+      await CycleBlockTodo(id)
+      await loadPage(pagePath, { focusBlockId: id })
+    } catch (e) {
+      notifyErr(e)
+    }
+  }
+
+  /** @param {string} id */
+  async function handleSwipeClear(id) {
+    if (typeof window !== 'undefined' && !window.confirm('Clear this block text?')) return
+    err = ''
+    try {
+      await syncAllBlocksFromDOM()
+      await UpdateBlock(id, '')
+      await loadPage(pagePath, { focusBlockId: id })
     } catch (e) {
       notifyErr(e)
     }
@@ -420,6 +460,14 @@
       {theme === 'dark' ? 'Light' : 'Dark'} mode
     </button>
     <button type="button" class="btn secondary" on:click={openGraph}>Graph</button>
+    <button type="button" class="btn secondary" on:click={openAbout}>About</button>
+    {#each $toolbarEntries as p (p.id)}
+      <button
+        type="button"
+        class="btn secondary plugin-tb"
+        on:click={() => p.run?.()}
+      >{p.label}</button>
+    {/each}
   </div>
 
   {#if selectedIds.length > 0}
@@ -427,6 +475,24 @@
       <span class="bulk-count">{selectedIds.length} selected</span>
       <button type="button" class="btn secondary sm" on:click={copySelectedMarkdown}>Copy text</button>
       <button type="button" class="btn secondary sm" on:click={clearSelection}>Clear</button>
+    </div>
+  {/if}
+
+  {#if aboutOpen}
+    <div
+      class="about-backdrop"
+      role="presentation"
+      on:click|self={() => (aboutOpen = false)}
+    >
+      <div class="about-card" role="dialog" aria-modal="true" aria-labelledby="about-title">
+        <h2 id="about-title">Dingovault</h2>
+        <p class="about-ver">{appVersion || '…'}</p>
+        <p class="about-copy">
+          Local-first outliner with Markdown blocks, FTS search, and optional cloud sync. See the repository README for
+          setup, SaaS mode, and security notes.
+        </p>
+        <button type="button" class="btn secondary" on:click={() => (aboutOpen = false)}>Close</button>
+      </div>
     </div>
   {/if}
 
@@ -466,6 +532,8 @@
           {selectedIds}
           onToggleSelect={toggleSelect}
           onReorderBefore={handleReorderBefore}
+          onSwipeTodo={handleSwipeTodo}
+          onSwipeClear={handleSwipeClear}
         />
       {/each}
     {/if}
@@ -473,11 +541,22 @@
 
   <Backlinks {notesRoot} {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
 
+  {#if $sidebarEntries.length}
+    <aside class="plugin-sidebar" aria-label="Plugin sidebar">
+      {#each $sidebarEntries as s (s.id)}
+        <section class="plugin-card">
+          <h3 class="plugin-card-title">{s.title}</h3>
+          <p class="plugin-card-body">{s.body}</p>
+        </section>
+      {/each}
+    </aside>
+  {/if}
+
   <p class="hint">
     <kbd>Ctrl</kbd>+<kbd>K</kbd> palette · <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> indent ·
     <kbd>Cmd</kbd>+<kbd>Enter</kbd> TODO cycle · <kbd>/</kbd> commands · <kbd>Enter</kbd> at end adds sibling ·
     drag <span class="hint-mono">⠿</span> to reorder siblings · fold <span class="hint-mono">▾</span> · checkboxes
-    multi-select
+    multi-select · mobile: swipe rail <span class="hint-mono">←</span> TODO · <span class="hint-mono">→</span> clear
   </p>
 </main>
 
@@ -530,6 +609,36 @@
     margin: 0 auto;
     padding: 20px max(16px, env(safe-area-inset-left)) 56px max(16px, env(safe-area-inset-right));
     box-sizing: border-box;
+  }
+  @media (max-width: 640px) {
+    .layout {
+      max-width: 100%;
+      padding: 12px max(12px, env(safe-area-inset-left)) max(72px, env(safe-area-inset-bottom))
+        max(12px, env(safe-area-inset-right));
+    }
+    .top h1 {
+      font-size: 1.35rem;
+    }
+    .toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .path-input {
+      min-width: 0;
+      width: 100%;
+      font-size: 16px;
+    }
+    .btn {
+      min-height: 44px;
+      font-size: 1rem;
+      touch-action: manipulation;
+    }
+    .outliner-panel {
+      padding: 12px;
+    }
+    .breadcrumbs {
+      font-size: 0.72rem;
+    }
   }
   .breadcrumbs {
     display: flex;
@@ -633,6 +742,43 @@
     padding: 4px 10px;
     font-size: 0.8rem;
   }
+  .about-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.45);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+  .about-card {
+    max-width: 380px;
+    width: 100%;
+    padding: 20px 22px;
+    border-radius: 12px;
+    border: 1px solid var(--dv-border);
+    background: var(--dv-panel);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  }
+  .about-card h2 {
+    margin: 0 0 4px;
+    font-size: 1.25rem;
+  }
+  .about-ver {
+    margin: 0 0 12px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    opacity: 0.65;
+  }
+  .about-copy {
+    margin: 0 0 16px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    opacity: 0.85;
+  }
   .graph-panel {
     margin-top: 16px;
     padding: 14px 16px 8px;
@@ -663,6 +809,34 @@
     font-family: ui-monospace, monospace;
     font-size: 0.72rem;
     opacity: 0.75;
+  }
+  .plugin-tb {
+    font-size: 0.85rem;
+  }
+  .plugin-sidebar {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .plugin-card {
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-fg) 4%, transparent);
+  }
+  .plugin-card-title {
+    margin: 0 0 6px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.65;
+  }
+  .plugin-card-body {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
   }
   kbd {
     font-size: 0.75rem;

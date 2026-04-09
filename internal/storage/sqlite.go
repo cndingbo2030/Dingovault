@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,8 +106,9 @@ CREATE INDEX IF NOT EXISTS idx_page_aliases_path ON page_aliases(source_path);
 // Store wraps database access with a write mutex so goroutine-heavy indexing can
 // serialize mutations while reads use the pool concurrently.
 type Store struct {
-	db *sql.DB
-	mu sync.Mutex
+	db            *sql.DB
+	mu            sync.Mutex
+	masterCipher  *MasterCipher // optional; DINGO_MASTER_KEY — encrypts block content in DB
 }
 
 // OpenSQLite opens (or creates) a SQLite file, applies schema DDL, and returns a Store.
@@ -121,7 +125,17 @@ func OpenSQLite(path string) (*Store, error) {
 		return nil, err
 	}
 
-	return &Store{db: db}, nil
+	st := &Store{db: db}
+	if mk := strings.TrimSpace(os.Getenv("DINGO_MASTER_KEY")); mk != "" {
+		ciph, err := NewMasterCipher(mk)
+		if err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("DINGO_MASTER_KEY: %w", err)
+		}
+		st.masterCipher = ciph
+		log.Printf("DINGO_MASTER_KEY set: block content is encrypted at rest in SQLite (FTS body search is ineffective on ciphertext)")
+	}
+	return st, nil
 }
 
 // DB returns the underlying *sql.DB for read-heavy queries (callers must not close it).
@@ -165,8 +179,8 @@ func InitSchema(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, SchemaDDL); err != nil {
 		return fmt.Errorf("apply schema: %w", err)
 	}
-	if err := MigrateMultiTenant(ctx, db); err != nil {
-		return fmt.Errorf("migrate multi-tenant: %w", err)
+	if err := RunSchemaMigrations(ctx, db); err != nil {
+		return fmt.Errorf("schema migrations: %w", err)
 	}
 	return nil
 }

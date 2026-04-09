@@ -31,7 +31,7 @@ FROM blocks WHERE user_id = ? AND id IN (%s)`, placeholders)
 	}
 	defer rows.Close()
 
-	blocks, err := scanBlockRows(rows)
+	blocks, err := s.scanBlockRows(rows)
 	if err != nil {
 		return nil, err
 	}
