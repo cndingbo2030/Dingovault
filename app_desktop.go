@@ -8,6 +8,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/cndingbo2030/dingovault/internal/bridge"
 	"github.com/cndingbo2030/dingovault/internal/bus"
@@ -31,6 +32,20 @@ import (
 var assets embed.FS
 
 func main() {
+	cfg := loadConfig()
+	notesPath := resolveDesktopNotesPath(cfg)
+	store := openDesktopStore(cfg)
+	defer closeProvider(store)
+
+	graphSvc := setupDesktopGraph(store)
+	idx := buildDesktopIndexer(notesPath, graphSvc, cfg.CloudMode)
+	defer func() { _ = idx.Close() }()
+
+	app := bridge.NewApp(store, graphSvc, notesPath)
+	runDesktopApp(cfg, app, idx, notesPath)
+}
+
+func loadConfig() config.Config {
 	dbPath := flag.String("db", "dingovault.db", "path to SQLite database file (ignored in cloud mode)")
 	notes := flag.String("notes", "", "directory of Markdown notes to index and watch (optional if saved in config)")
 	flag.Parse()
@@ -40,22 +55,29 @@ func main() {
 		log.Printf("config load: %v", err)
 		cfg = config.Default()
 	}
-
-	cloudMode := cfg.CloudMode || os.Getenv("DINGO_CLOUD_MODE") == "1"
-	cloudURL := cfg.CloudAPIURL
-	if v := os.Getenv("DINGO_CLOUD_URL"); v != "" {
-		cloudURL = v
+	cfg.Window.Width = max(cfg.Window.Width, 1)
+	cfg.Window.Height = max(cfg.Window.Height, 1)
+	cfg.VaultPath = strings.TrimSpace(cfg.VaultPath)
+	cfg.CloudAPIURL = strings.TrimSpace(cfg.CloudAPIURL)
+	cfg.CloudToken = strings.TrimSpace(cfg.CloudToken)
+	cfg.CloudMode = cfg.CloudMode || os.Getenv("DINGO_CLOUD_MODE") == "1"
+	if v := strings.TrimSpace(os.Getenv("DINGO_CLOUD_URL")); v != "" {
+		cfg.CloudAPIURL = v
 	}
-	cloudTok := cfg.CloudToken
-	if v := os.Getenv("DINGO_CLOUD_TOKEN"); v != "" {
-		cloudTok = v
+	if v := strings.TrimSpace(os.Getenv("DINGO_CLOUD_TOKEN")); v != "" {
+		cfg.CloudToken = v
 	}
+	_ = dbPath
+	_ = notes
+	return cfg
+}
 
-	notesPath := *notes
+func resolveDesktopNotesPath(cfg config.Config) string {
+	notesPath := strings.TrimSpace(flag.Lookup("notes").Value.String())
 	if notesPath == "" {
 		notesPath = cfg.VaultPath
 	}
-	if notesPath == "" && config.ShouldOpenBundledDemo(*notes, cfg) {
+	if notesPath == "" && config.ShouldOpenBundledDemo(flag.Lookup("notes").Value.String(), cfg) {
 		if os.Getenv("DINGO_NO_DEMO_VAULT") == "1" {
 			log.Fatal("no vault path: pass -notes, set vaultPath in config, or unset DINGO_NO_DEMO_VAULT to use the built-in Demo Vault")
 		}
@@ -72,43 +94,52 @@ func main() {
 	if _, err := os.Stat(notesPath); err != nil {
 		log.Fatalf("notes directory: %v", err)
 	}
+	return notesPath
+}
 
+func openDesktopStore(cfg config.Config) storage.Provider {
 	var store storage.Provider
-	if cloudMode {
-		if cloudURL == "" || cloudTok == "" {
+	if cfg.CloudMode {
+		if cfg.CloudAPIURL == "" || cfg.CloudToken == "" {
 			log.Fatal("cloud mode requires cloudApiUrl + cloudToken in config, or DINGO_CLOUD_URL + DINGO_CLOUD_TOKEN")
 		}
-		rs, err := storage.NewRemoteStore(cloudURL, cloudTok)
+		rs, err := storage.NewRemoteStore(cfg.CloudAPIURL, cfg.CloudToken)
 		if err != nil {
 			log.Fatalf("remote store: %v", err)
 		}
 		store = rs
-		log.Printf("cloud mode: API %s (local vault at %s for editing; index syncs via HTTP)", cloudURL, notesPath)
+		log.Printf("cloud mode: API %s (local vault path from config)", cfg.CloudAPIURL)
 	} else {
-		st, err := storage.OpenSQLite(*dbPath)
+		dbPath := flag.Lookup("db").Value.String()
+		st, err := storage.OpenSQLite(dbPath)
 		if err != nil {
 			log.Fatalf("open database: %v", err)
 		}
 		store = st
 	}
-	defer func() {
-		if err := store.Close(); err != nil {
-			log.Printf("close store: %v", err)
-		}
-	}()
+	return store
+}
 
+func closeProvider(store storage.Provider) {
+	if err := store.Close(); err != nil {
+		log.Printf("close store: %v", err)
+	}
+}
+
+func setupDesktopGraph(store storage.Provider) *graph.Service {
 	engine := parser.NewEngine()
 	graphSvc := graph.NewService(store, engine)
 	eventBus := bus.New()
 	graphSvc.SetBus(eventBus)
 	_ = summarizer.Register(eventBus, store, engine)
+	return graphSvc
+}
 
+func buildDesktopIndexer(notesPath string, graphSvc *graph.Service, cloudMode bool) *scanner.Indexer {
 	idx, err := scanner.NewIndexer(notesPath, graphSvc)
 	if err != nil {
 		log.Fatalf("indexer: %v", err)
 	}
-	defer func() { _ = idx.Close() }()
-
 	ctxScan := tenant.WithUserID(context.Background(), tenant.LocalUserID)
 	log.Printf("full scan of %s", notesPath)
 	if cloudMode {
@@ -117,12 +148,14 @@ func main() {
 	if err := idx.FullScan(ctxScan); err != nil {
 		log.Fatalf("full scan: %v", err)
 	}
+	return idx
+}
 
-	app := bridge.NewApp(store, graphSvc, notesPath)
+func runDesktopApp(cfg config.Config, app *bridge.App, idx *scanner.Indexer, notesPath string) {
 	watchCtx, watchStop := context.WithCancel(context.Background())
 	defer watchStop()
 
-	err = wails.Run(&options.App{
+	err := wails.Run(&options.App{
 		Title:  "Dingovault",
 		Width:  cfg.Window.Width,
 		Height: cfg.Window.Height,

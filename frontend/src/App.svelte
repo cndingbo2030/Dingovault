@@ -574,8 +574,11 @@
         aria-labelledby="about-title"
         transition:fly={{ y: 16, duration: 220, easing: cubicOut }}
       >
+        <div class="about-brand" aria-hidden="true">
+          <div class="about-logo">D</div>
+        </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || '…'}</p>
+        <p class="about-ver">{appVersion || 'v1.2.0'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>
@@ -965,6 +968,25 @@
   .about-card h2 {
     margin: 0 0 4px;
     font-size: 1.25rem;
+  }
+  .about-brand {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  .about-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #ecfeff;
+    background:
+      radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.28), transparent 45%),
+      linear-gradient(145deg, #0ea5e9, #fb7185);
+    box-shadow: 0 10px 24px rgba(6, 58, 100, 0.35);
   }
   .about-ver {
     margin: 0 0 12px;

@@ -63,62 +63,7 @@ func splitTextForHashTags(t *ast.Text, source []byte) {
 		return
 	}
 
-	type fragment struct {
-		kind  byte // 't' text, 'h' hashtag
-		start int
-		end   int
-		name  []byte
-	}
-	var frags []fragment
-
-	i := 0
-	for i < len(raw) {
-		if raw[i] != '#' {
-			start := i
-			for i < len(raw) && raw[i] != '#' {
-				i++
-			}
-			if start < i {
-				frags = append(frags, fragment{kind: 't', start: start, end: i})
-			}
-			continue
-		}
-		// ## at markdown-style — keep literal first '#', continue scanning from next char
-		if i+1 < len(raw) && raw[i+1] == '#' {
-			frags = append(frags, fragment{kind: 't', start: i, end: i + 1})
-			i++
-			continue
-		}
-		j := i + 1
-		if j >= len(raw) {
-			frags = append(frags, fragment{kind: 't', start: i, end: i + 1})
-			i++
-			continue
-		}
-		r, w := utf8.DecodeRune(raw[j:])
-		if !isTagStartRune(r) {
-			frags = append(frags, fragment{kind: 't', start: i, end: i + 1})
-			i++
-			continue
-		}
-		j += w
-		for j < len(raw) {
-			r2, w2 := utf8.DecodeRune(raw[j:])
-			if !isTagContinueRune(r2) {
-				break
-			}
-			j += w2
-		}
-		if j <= i+1 {
-			frags = append(frags, fragment{kind: 't', start: i, end: i + 1})
-			i++
-			continue
-		}
-		name := raw[i+1 : j]
-		frags = append(frags, fragment{kind: 'h', start: i, end: j, name: name})
-		i = j
-	}
-
+	frags := collectTagFragments(raw)
 	if len(frags) == 0 {
 		return
 	}
@@ -145,6 +90,66 @@ func splitTextForHashTags(t *ast.Text, source []byte) {
 			parent.InsertBefore(parent, next, NewHashTag(f.name, s))
 		}
 	}
+}
+
+type fragment struct {
+	kind  byte // 't' text, 'h' hashtag
+	start int
+	end   int
+	name  []byte
+}
+
+func collectTagFragments(raw []byte) []fragment {
+	var frags []fragment
+	for i := 0; i < len(raw); {
+		if raw[i] != '#' {
+			start, next := scanPlainText(raw, i)
+			if start < next {
+				frags = append(frags, fragment{kind: 't', start: start, end: next})
+			}
+			i = next
+			continue
+		}
+		f, next := scanHashTag(raw, i)
+		frags = append(frags, f)
+		i = next
+	}
+	return frags
+}
+
+func scanPlainText(raw []byte, i int) (start int, next int) {
+	start = i
+	for i < len(raw) && raw[i] != '#' {
+		i++
+	}
+	return start, i
+}
+
+func scanHashTag(raw []byte, i int) (fragment, int) {
+	// ## at markdown-style — keep literal first '#', continue scanning from next char
+	if i+1 < len(raw) && raw[i+1] == '#' {
+		return fragment{kind: 't', start: i, end: i + 1}, i + 1
+	}
+	j := i + 1
+	if j >= len(raw) {
+		return fragment{kind: 't', start: i, end: i + 1}, i + 1
+	}
+	r, w := utf8.DecodeRune(raw[j:])
+	if !isTagStartRune(r) {
+		return fragment{kind: 't', start: i, end: i + 1}, i + 1
+	}
+	j += w
+	for j < len(raw) {
+		r2, w2 := utf8.DecodeRune(raw[j:])
+		if !isTagContinueRune(r2) {
+			break
+		}
+		j += w2
+	}
+	if j <= i+1 {
+		return fragment{kind: 't', start: i, end: i + 1}, i + 1
+	}
+	return fragment{kind: 'h', start: i, end: j, name: raw[i+1 : j]}, j
 }
 
 func isTagStartRune(r rune) bool {

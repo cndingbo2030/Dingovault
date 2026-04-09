@@ -33,7 +33,31 @@ const defaultSaaSPort = "12030"
 const defaultDesktopDB = "dingovault.db"
 const saasDBFile = "dingovault_saas.db"
 
+type cliOptions struct {
+	dbFile   string
+	notes    string
+	httpMode bool
+}
+
 func main() {
+	opts, extraArgs := parseCLI()
+	store := openStore(opts.dbFile)
+	defer closeStore(store)
+
+	graphSvc := setupGraph(store)
+	if handled, err := handleDebugCommand(store, opts.dbFile, strings.TrimSpace(opts.notes), extraArgs); handled {
+		if err != nil {
+			log.Fatalf("debug command: %v", err)
+		}
+		return
+	}
+
+	assetBlobs := setupBlobProvider(opts.notes)
+	httpSrv := maybeStartHTTPServer(opts, store, graphSvc, assetBlobs)
+	runIndexerLoop(opts.notes, graphSvc, httpSrv)
+}
+
+func parseCLI() (cliOptions, []string) {
 	dbPath := flag.String("db", defaultDesktopDB, "path to SQLite database file")
 	notes := flag.String("notes", "", "directory of Markdown notes to index and watch (optional if saved in config)")
 	serverFlag := flag.Bool("server", false, "run HTTP SaaS API on DINGO_PORT (default "+defaultSaaSPort+")")
@@ -44,88 +68,105 @@ func main() {
 		log.Printf("config load: %v", err)
 		cfg = config.Default()
 	}
-	notesPath := *notes
-	if notesPath == "" {
-		notesPath = cfg.VaultPath
-	}
-
+	notesPath := resolveNotesPath(*notes, cfg.VaultPath)
 	httpMode := *serverFlag || os.Getenv("DINGO_SERVER") == "1" || os.Getenv("DINGO_PORT") != ""
+	dbFile := resolveDBFile(*dbPath, httpMode)
+	return cliOptions{dbFile: dbFile, notes: notesPath, httpMode: httpMode}, flag.Args()
+}
 
-	dbFile := *dbPath
-	if httpMode && *dbPath == defaultDesktopDB {
-		dbFile = filepath.Clean(saasDBFile)
-		log.Printf("SaaS mode: using isolated database %s (override with -db)", dbFile)
+func resolveNotesPath(flagNotes, configNotes string) string {
+	if flagNotes != "" {
+		return flagNotes
 	}
+	return configNotes
+}
 
+func resolveDBFile(dbPath string, httpMode bool) string {
+	if httpMode && dbPath == defaultDesktopDB {
+		dbFile := filepath.Clean(saasDBFile)
+		log.Printf("SaaS mode: using isolated database %s (override with -db)", dbFile)
+		return dbFile
+	}
+	return dbPath
+}
+
+func openStore(dbFile string) *storage.Store {
 	store, err := storage.OpenSQLite(dbFile)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}
-	defer func() {
-		if err := store.Close(); err != nil {
-			log.Printf("close database: %v", err)
-		}
-	}()
+	return store
+}
 
+func closeStore(store *storage.Store) {
+	if err := store.Close(); err != nil {
+		log.Printf("close database: %v", err)
+	}
+}
+
+func setupGraph(store storage.Provider) *graph.Service {
 	engine := parser.NewEngine()
 	graphSvc := graph.NewService(store, engine)
 	eventBus := bus.New()
 	graphSvc.SetBus(eventBus)
 	_ = summarizer.Register(eventBus, store, engine)
+	return graphSvc
+}
 
-	if handled, err := handleDebugCommand(store, dbFile, strings.TrimSpace(notesPath), flag.Args()); handled {
-		if err != nil {
-			log.Fatalf("debug command: %v", err)
-		}
-		return
-	}
-
-	var httpSrv *http.Server
-	blobCtx := context.Background()
-	assetBlobs, err := blob.NewProviderFromEnv(blobCtx, strings.TrimSpace(notesPath))
+func setupBlobProvider(notesPath string) blob.Provider {
+	assetBlobs, err := blob.NewProviderFromEnv(context.Background(), strings.TrimSpace(notesPath))
 	if err != nil {
 		log.Fatalf("asset blob storage: %v", err)
 	}
 	if assetBlobs != nil {
 		log.Printf("asset uploads: blob backend active")
 	}
+	return assetBlobs
+}
 
-	if httpMode {
-		port := os.Getenv("DINGO_PORT")
-		if port == "" {
-			port = defaultSaaSPort
-		}
-		if _, err := strconv.Atoi(port); err != nil {
-			log.Fatalf("invalid DINGO_PORT %q: %v", port, err)
-		}
-
-		jwtSvc, err := auth.NewJWTFromEnv("dingovault-api", 24*time.Hour, true)
-		if err != nil {
-			log.Fatalf("jwt: %v", err)
-		}
-
-		mux := http.NewServeMux()
-		server.MountAPI(mux, store, jwtSvc, graphSvc, strings.TrimSpace(notesPath), assetBlobs)
-
-		var handler http.Handler = mux
-		if o := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS")); o != "" {
-			handler = server.CORSMiddleware(o, mux)
-			log.Printf("CORS enabled (ALLOWED_ORIGINS=%q)", o)
-		}
-
-		httpSrv = &http.Server{
-			Addr:              ":" + port,
-			Handler:           handler,
-			ReadHeaderTimeout: 10 * time.Second,
-		}
-		go func() {
-			log.Printf("SaaS API listening on http://127.0.0.1:%s (prefix /api/v1)", port)
-			if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("http server: %v", err)
-			}
-		}()
+func maybeStartHTTPServer(opts cliOptions, store *storage.Store, graphSvc *graph.Service, assetBlobs blob.Provider) *http.Server {
+	if !opts.httpMode {
+		return nil
 	}
+	port := os.Getenv("DINGO_PORT")
+	if port == "" {
+		port = defaultSaaSPort
+	}
+	if _, err := strconv.Atoi(port); err != nil {
+		log.Fatalf("invalid DINGO_PORT %q: %v", port, err)
+	}
+	jwtSvc, err := auth.NewJWTFromEnv("dingovault-api", 24*time.Hour, true)
+	if err != nil {
+		log.Fatalf("jwt: %v", err)
+	}
+	mux := http.NewServeMux()
+	server.MountAPI(mux, store, jwtSvc, graphSvc, strings.TrimSpace(opts.notes), assetBlobs)
+	handler := withOptionalCORS(mux)
+	httpSrv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	go serveHTTP(httpSrv, port)
+	return httpSrv
+}
 
+func withOptionalCORS(mux *http.ServeMux) http.Handler {
+	if o := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS")); o != "" {
+		log.Printf("CORS enabled (ALLOWED_ORIGINS=%q)", o)
+		return server.CORSMiddleware(o, mux)
+	}
+	return mux
+}
+
+func serveHTTP(httpSrv *http.Server, port string) {
+	log.Printf("SaaS API listening on http://127.0.0.1:%s (prefix /api/v1)", port)
+	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("http server: %v", err)
+	}
+}
+
+func runIndexerLoop(notesPath string, graphSvc *graph.Service, httpSrv *http.Server) {
 	if notesPath == "" {
 		if httpSrv == nil {
 			log.Fatal("set -notes or save vaultPath via the desktop app config (or use -server without notes for API-only)")
@@ -157,23 +198,26 @@ func main() {
 			cancel()
 		}
 	}()
-
 	if httpSrv != nil {
-		go func() {
-			<-ctx.Done()
-			shCtx, shCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer shCancel()
-			_ = httpSrv.Shutdown(shCtx)
-		}()
+		go shutdownHTTPOnContextDone(httpSrv, ctx.Done())
 	}
-
 	<-ctx.Done()
 	log.Printf("shutdown: %v", ctx.Err())
-	if httpSrv != nil {
-		shCtx, shCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shCancel()
-		_ = httpSrv.Shutdown(shCtx)
+	shutdownHTTPServer(httpSrv)
+}
+
+func shutdownHTTPOnContextDone(httpSrv *http.Server, done <-chan struct{}) {
+	<-done
+	shutdownHTTPServer(httpSrv)
+}
+
+func shutdownHTTPServer(httpSrv *http.Server) {
+	if httpSrv == nil {
+		return
 	}
+	shCtx, shCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shCancel()
+	_ = httpSrv.Shutdown(shCtx)
 }
 
 func waitShutdown(srv *http.Server) {

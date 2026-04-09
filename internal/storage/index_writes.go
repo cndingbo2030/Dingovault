@@ -23,94 +23,137 @@ func (s *Store) ReplaceIndexedSource(ctx context.Context, absSourcePath string, 
 		}
 		defer func() { _ = tx.Rollback() }()
 
-		if _, err := tx.ExecContext(ctx, `DELETE FROM page_properties WHERE user_id = ? AND source_path = ?`, uid, absSourcePath); err != nil {
-			return fmt.Errorf("delete page properties: %w", err)
+		if err := clearIndexedSource(ctx, tx, uid, absSourcePath); err != nil {
+			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM page_aliases WHERE user_id = ? AND source_path = ?`, uid, absSourcePath); err != nil {
-			return fmt.Errorf("delete page aliases: %w", err)
+		if err := s.insertBlocks(ctx, tx, uid, absSourcePath, res); err != nil {
+			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM blocks WHERE user_id = ? AND source_path = ?`, uid, absSourcePath); err != nil {
-			return fmt.Errorf("delete old blocks: %w", err)
+		if err := insertWikiLinks(ctx, tx, res); err != nil {
+			return err
 		}
-
-		const insBlock = `
-INSERT INTO blocks (
-	id, user_id, parent_id, content, properties_json, source_path,
-	line_start, line_end, outline_level, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-
-		for _, b := range res.Blocks {
-			props := "{}"
-			if len(b.Properties) > 0 {
-				raw, mErr := json.Marshal(b.Properties)
-				if mErr != nil {
-					return fmt.Errorf("marshal properties: %w", mErr)
-				}
-				props = string(raw)
-			}
-			content, cErr := s.sealContent(b.Content)
-			if cErr != nil {
-				return fmt.Errorf("seal content: %w", cErr)
-			}
-			parent := sql.NullString{String: b.ParentID, Valid: b.ParentID != ""}
-			if _, err := tx.ExecContext(ctx, insBlock,
-				b.ID,
-				uid,
-				parent,
-				content,
-				props,
-				absSourcePath,
-				b.Metadata.LineStart,
-				b.Metadata.LineEnd,
-				b.Metadata.Level,
-				b.Metadata.CreatedAt.Unix(),
-				b.Metadata.UpdatedAt.Unix(),
-			); err != nil {
-				return fmt.Errorf("insert block %s: %w", b.ID, err)
-			}
+		if err := insertTags(ctx, tx, res); err != nil {
+			return err
 		}
-
-		const insWiki = `INSERT INTO block_wikilinks (source_block_id, target, display_alias) VALUES (?, ?, ?)`
-		for _, w := range res.Wikilinks {
-			if _, err := tx.ExecContext(ctx, insWiki, w.SourceBlockID, w.Target, w.Alias); err != nil {
-				return fmt.Errorf("insert wikilink: %w", err)
-			}
+		if err := insertPageProps(ctx, tx, uid, absSourcePath, pageProps); err != nil {
+			return err
 		}
-
-		const insTag = `INSERT OR IGNORE INTO block_tags (block_id, tag) VALUES (?, ?)`
-		for _, t := range res.Tags {
-			if _, err := tx.ExecContext(ctx, insTag, t.BlockID, t.Tag); err != nil {
-				return fmt.Errorf("insert tag: %w", err)
-			}
+		if err := insertAliases(ctx, tx, uid, absSourcePath, aliases); err != nil {
+			return err
 		}
-
-		const insProp = `INSERT INTO page_properties (user_id, source_path, prop_key, prop_value) VALUES (?, ?, ?, ?)`
-		for k, v := range pageProps {
-			k = strings.TrimSpace(k)
-			if k == "" {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx, insProp, uid, absSourcePath, k, v); err != nil {
-				return fmt.Errorf("insert page property: %w", err)
-			}
-		}
-
-		const insAlias = `INSERT OR REPLACE INTO page_aliases (user_id, alias_normalized, source_path) VALUES (?, ?, ?)`
-		for _, a := range aliases {
-			k := parser.NormalizeAliasKey(a)
-			if k == "" {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx, insAlias, uid, k, absSourcePath); err != nil {
-				return fmt.Errorf("insert alias: %w", err)
-			}
-		}
-
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit: %w", err)
 		}
 		return nil
 	})
+}
+
+func clearIndexedSource(ctx context.Context, tx *sql.Tx, uid, absSourcePath string) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM page_properties WHERE user_id = ? AND source_path = ?`, uid, absSourcePath); err != nil {
+		return fmt.Errorf("delete page properties: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM page_aliases WHERE user_id = ? AND source_path = ?`, uid, absSourcePath); err != nil {
+		return fmt.Errorf("delete page aliases: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM blocks WHERE user_id = ? AND source_path = ?`, uid, absSourcePath); err != nil {
+		return fmt.Errorf("delete old blocks: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) insertBlocks(ctx context.Context, tx *sql.Tx, uid, absSourcePath string, res parser.ParseResult) error {
+	const insBlock = `
+INSERT INTO blocks (
+	id, user_id, parent_id, content, properties_json, source_path,
+	line_start, line_end, outline_level, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+	for _, b := range res.Blocks {
+		props, err := marshalBlockProps(b.Properties)
+		if err != nil {
+			return err
+		}
+		content, err := s.sealContent(b.Content)
+		if err != nil {
+			return fmt.Errorf("seal content: %w", err)
+		}
+		parent := sql.NullString{String: b.ParentID, Valid: b.ParentID != ""}
+		if _, err := tx.ExecContext(ctx, insBlock,
+			b.ID,
+			uid,
+			parent,
+			content,
+			props,
+			absSourcePath,
+			b.Metadata.LineStart,
+			b.Metadata.LineEnd,
+			b.Metadata.Level,
+			b.Metadata.CreatedAt.Unix(),
+			b.Metadata.UpdatedAt.Unix(),
+		); err != nil {
+			return fmt.Errorf("insert block %s: %w", b.ID, err)
+		}
+	}
+	return nil
+}
+
+func marshalBlockProps(props map[string]string) (string, error) {
+	if len(props) == 0 {
+		return "{}", nil
+	}
+	raw, err := json.Marshal(props)
+	if err != nil {
+		return "", fmt.Errorf("marshal properties: %w", err)
+	}
+	return string(raw), nil
+}
+
+func insertWikiLinks(ctx context.Context, tx *sql.Tx, res parser.ParseResult) error {
+	const insWiki = `INSERT INTO block_wikilinks (source_block_id, target, display_alias) VALUES (?, ?, ?)`
+	for _, w := range res.Wikilinks {
+		if _, err := tx.ExecContext(ctx, insWiki, w.SourceBlockID, w.Target, w.Alias); err != nil {
+			return fmt.Errorf("insert wikilink: %w", err)
+		}
+	}
+	return nil
+}
+
+func insertTags(ctx context.Context, tx *sql.Tx, res parser.ParseResult) error {
+	const insTag = `INSERT OR IGNORE INTO block_tags (block_id, tag) VALUES (?, ?)`
+	for _, t := range res.Tags {
+		if _, err := tx.ExecContext(ctx, insTag, t.BlockID, t.Tag); err != nil {
+			return fmt.Errorf("insert tag: %w", err)
+		}
+	}
+	return nil
+}
+
+func insertPageProps(ctx context.Context, tx *sql.Tx, uid, absSourcePath string, pageProps map[string]string) error {
+	const insProp = `INSERT INTO page_properties (user_id, source_path, prop_key, prop_value) VALUES (?, ?, ?, ?)`
+	for k, v := range pageProps {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, insProp, uid, absSourcePath, k, v); err != nil {
+			return fmt.Errorf("insert page property: %w", err)
+		}
+	}
+	return nil
+}
+
+func insertAliases(ctx context.Context, tx *sql.Tx, uid, absSourcePath string, aliases []string) error {
+	const insAlias = `INSERT OR REPLACE INTO page_aliases (user_id, alias_normalized, source_path) VALUES (?, ?, ?)`
+	for _, a := range aliases {
+		k := parser.NormalizeAliasKey(a)
+		if k == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, insAlias, uid, k, absSourcePath); err != nil {
+			return fmt.Errorf("insert alias: %w", err)
+		}
+	}
+	return nil
 }
 
 // DeleteIndexedSource removes blocks (and cascading edges), page_properties, and page_aliases for a path.

@@ -106,9 +106,9 @@ CREATE INDEX IF NOT EXISTS idx_page_aliases_path ON page_aliases(source_path);
 // Store wraps database access with a write mutex so goroutine-heavy indexing can
 // serialize mutations while reads use the pool concurrently.
 type Store struct {
-	db            *sql.DB
-	mu            sync.Mutex
-	masterCipher  *MasterCipher // optional; DINGO_MASTER_KEY — encrypts block content in DB
+	db           *sql.DB
+	mu           sync.Mutex
+	masterCipher *MasterCipher // optional; DINGO_MASTER_KEY — encrypts block content in DB
 }
 
 // OpenSQLite opens (or creates) a SQLite file, applies schema DDL, and returns a Store.
