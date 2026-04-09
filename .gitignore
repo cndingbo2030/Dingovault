@@ -1,0 +1,21 @@
+/bin/
+/build/
+/dist/
+frontend/node_modules/
+*.db
+*.db-shm
+*.db-wal
+dingovault_saas.db
+dingovault.db
+.DS_Store
+
+# Secrets & local overrides (never commit tokens)
+.env
+.env.*
+*.pem
+secrets/
+
+# OS / editor
+.idea/
+.vscode/
+*.swp

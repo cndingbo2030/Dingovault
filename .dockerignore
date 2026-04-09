@@ -1,0 +1,10 @@
+.git
+frontend/node_modules
+frontend/dist
+build
+dist
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+.env
