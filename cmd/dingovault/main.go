@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -69,6 +72,13 @@ func main() {
 	eventBus := bus.New()
 	graphSvc.SetBus(eventBus)
 	_ = summarizer.Register(eventBus, store, engine)
+
+	if handled, err := handleDebugCommand(store, dbFile, strings.TrimSpace(notesPath), flag.Args()); handled {
+		if err != nil {
+			log.Fatalf("debug command: %v", err)
+		}
+		return
+	}
 
 	var httpSrv *http.Server
 	blobCtx := context.Background()
@@ -174,4 +184,135 @@ func waitShutdown(srv *http.Server) {
 	defer shCancel()
 	_ = srv.Shutdown(shCtx)
 	log.Printf("shutdown complete")
+}
+
+func handleDebugCommand(store *storage.Store, dbPath, notesPath string, args []string) (bool, error) {
+	if len(args) == 0 || strings.ToLower(strings.TrimSpace(args[0])) != "debug" {
+		return false, nil
+	}
+	if len(args) < 2 {
+		return true, fmt.Errorf("usage: dingovault debug <graph|doctor|migrate-redo>")
+	}
+	switch strings.ToLower(strings.TrimSpace(args[1])) {
+	case "graph":
+		return true, runDebugGraph(store)
+	case "doctor":
+		return true, runDebugDoctor(store, dbPath, notesPath)
+	case "migrate-redo":
+		return true, runDebugMigrateRedo(store)
+	default:
+		return true, fmt.Errorf("unknown debug command %q (expected graph, doctor, or migrate-redo)", args[1])
+	}
+}
+
+func runDebugGraph(store *storage.Store) error {
+	st, err := store.IndexStats(context.Background())
+	if err != nil {
+		return err
+	}
+	fmt.Printf("graph summary:\n")
+	fmt.Printf("  blocks: %d\n", st.BlockCount)
+	fmt.Printf("  pages: %d\n", st.PageCount)
+	fmt.Printf("  tenants: %d\n", st.TenantCount)
+	return nil
+}
+
+func runDebugDoctor(store *storage.Store, dbPath, notesPath string) error {
+	fmt.Println("doctor report:")
+	fmt.Printf("  db_path: %s\n", dbPath)
+	if err := reportPathPerms("db_file", dbPath); err != nil {
+		return err
+	}
+	if err := reportPathPerms("db_dir", filepath.Dir(dbPath)); err != nil {
+		return err
+	}
+	if strings.TrimSpace(notesPath) != "" {
+		if err := reportPathPerms("notes_dir", notesPath); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("  notes_dir: not set\n")
+	}
+	if err := reportSQLiteWAL(store.DB(), dbPath); err != nil {
+		return err
+	}
+	reportJWTStrength()
+	return nil
+}
+
+func reportPathPerms(label, path string) error {
+	st, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("%s stat %q: %w", label, path, err)
+	}
+	mode := st.Mode().Perm()
+	fmt.Printf("  %s_perms: %s (%#o)\n", label, mode.String(), mode)
+	return nil
+}
+
+func reportSQLiteWAL(db *sql.DB, dbPath string) error {
+	var mode string
+	if err := db.QueryRowContext(context.Background(), `PRAGMA journal_mode`).Scan(&mode); err != nil {
+		return fmt.Errorf("sqlite journal_mode: %w", err)
+	}
+	fmt.Printf("  sqlite_journal_mode: %s\n", strings.ToUpper(strings.TrimSpace(mode)))
+	walPath := dbPath + "-wal"
+	if st, err := os.Stat(walPath); err == nil {
+		fmt.Printf("  sqlite_wal_file: present (%d bytes)\n", st.Size())
+	} else if os.IsNotExist(err) {
+		fmt.Printf("  sqlite_wal_file: not present\n")
+	} else {
+		return fmt.Errorf("sqlite wal stat %q: %w", walPath, err)
+	}
+	return nil
+}
+
+func reportJWTStrength() {
+	secret := strings.TrimSpace(os.Getenv("DINGO_JWT_SECRET"))
+	if secret == "" {
+		secret = auth.DefaultDevSecret
+		fmt.Printf("  jwt_secret_source: default-dev\n")
+	} else {
+		fmt.Printf("  jwt_secret_source: env\n")
+	}
+	n := len(secret)
+	sum := sha256.Sum256([]byte(secret))
+	fmt.Printf("  jwt_secret_len: %d\n", n)
+	fmt.Printf("  jwt_secret_sha256_prefix: %x\n", sum[:4])
+	switch {
+	case n >= 48:
+		fmt.Printf("  jwt_secret_strength: strong\n")
+	case n >= 32:
+		fmt.Printf("  jwt_secret_strength: good\n")
+	case n >= 16:
+		fmt.Printf("  jwt_secret_strength: weak\n")
+	default:
+		fmt.Printf("  jwt_secret_strength: invalid (<16 bytes)\n")
+	}
+}
+
+func runDebugMigrateRedo(store *storage.Store) error {
+	ctx := context.Background()
+	db := store.DB()
+	v, err := storage.ReadUserVersion(ctx, db)
+	if err != nil {
+		return err
+	}
+	if v <= 0 {
+		fmt.Printf("migrate-redo: user_version=%d, nothing to redo\n", v)
+		return nil
+	}
+	target := v - 1
+	if err := storage.WriteUserVersion(ctx, db, target); err != nil {
+		return err
+	}
+	if err := storage.RunSchemaMigrations(ctx, db); err != nil {
+		return err
+	}
+	finalV, err := storage.ReadUserVersion(ctx, db)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("migrate-redo: replayed from %d -> %d\n", target, finalV)
+	return nil
 }
