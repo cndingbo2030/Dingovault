@@ -30,15 +30,14 @@ This is **not** a pub/sub topic. Register a hook on the **same** `*bus.Bus` inst
 b := bus.New()
 graphSvc.SetBus(b)
 
-b.RegisterBeforeBlockSave(func(ctx context.Context, d *bus.BeforeBlockSaveData) error {
-    // Mutate markdown before it hits disk / SQLite, e.g. auto-format or AI rewrite.
-    d.Content = strings.TrimSpace(d.Content)
-    return nil
+b.RegisterBeforeBlockSave(func(ctx context.Context, d bus.BeforeBlockSaveData) (string, error) {
+    // Return transformed markdown before it hits disk / SQLite (auto-format, AI rewrite, etc.).
+    return strings.TrimSpace(d.Content), nil
 })
 ```
 
-- Hooks run in **registration order**.
-- Return **`error`** to **abort** the save (the error is surfaced to the client as a save failure).
+- Hooks run in **registration order**. Each handler receives the **latest** string from the previous hook.
+- Return **`("", err)`** to **abort** the save (the error is surfaced to the client as a save failure).
 - See `BeforeBlockSaveData` in `internal/bus/bus.go` for path, block ID, and content fields.
 
 ### `after:block:indexed` (pub/sub)
