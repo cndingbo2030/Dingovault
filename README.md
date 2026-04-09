@@ -2,7 +2,19 @@
 
 [中文文档](README_zh.md) | English
 
+[![Release](https://github.com/cndingbo2030/dingovault/actions/workflows/release.yml/badge.svg)](https://github.com/cndingbo2030/dingovault/actions)
+[![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **High-performance, local-first outliner with SaaS sync, built in Go.**
+
+From source (CLI / server binary):
+
+```bash
+go install github.com/cndingbo2030/dingovault/cmd/dingovault@latest
+```
+
+Go module path: **`github.com/cndingbo2030/dingovault`**
 
 Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikilinks, YAML frontmatter, and a clean desktop shell. The same core runs **offline** against embedded **SQLite** or **online** against your **self-hosted or managed SaaS API**—switchable via a small `storage.Provider` abstraction.
 
@@ -20,7 +32,7 @@ Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikili
 |--|--|
 | **Maintainer** | **cndingbo2030** |
 | **Email** | **[cndingbo@outlook.com](mailto:cndingbo@outlook.com)** |
-| **Repository** | [github.com/cndingbo2030/Dingovault](https://github.com/cndingbo2030/Dingovault) |
+| **Repository** | [github.com/cndingbo2030/dingovault](https://github.com/cndingbo2030/dingovault) |
 
 ---
 
@@ -227,7 +239,7 @@ For **`/api/v1/capture`**, **`/api/v1/assets`**, and **`/api/v1/graph/wiki`**, r
 
 ## Repository metadata
 
-Upstream: **[github.com/cndingbo2030/Dingovault](https://github.com/cndingbo2030/Dingovault)**  
+Upstream: **[github.com/cndingbo2030/dingovault](https://github.com/cndingbo2030/dingovault)**  
 Also see `project.meta.json`.
 
 ---

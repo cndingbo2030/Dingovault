@@ -23,7 +23,7 @@ jobs:
   build-server:
     needs: test
     env:
-      GO_LDFLAGS: -s -w -X github.com/dingbo/dingovault/internal/version.String=${{ github.ref_name }}
+      GO_LDFLAGS: -s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${{ github.ref_name }}
     strategy:
       matrix:
         include:
@@ -59,7 +59,7 @@ jobs:
     needs: test
     runs-on: ubuntu-22.04
     env:
-      GO_LDFLAGS: -s -w -X github.com/dingbo/dingovault/internal/version.String=${{ github.ref_name }}
+      GO_LDFLAGS: -s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -90,7 +90,7 @@ jobs:
     needs: test
     runs-on: macos-latest
     env:
-      GO_LDFLAGS: -s -w -X github.com/dingbo/dingovault/internal/version.String=${{ github.ref_name }}
+      GO_LDFLAGS: -s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -116,7 +116,7 @@ jobs:
     needs: test
     runs-on: windows-latest
     env:
-      GO_LDFLAGS: -s -w -X github.com/dingbo/dingovault/internal/version.String=${{ github.ref_name }}
+      GO_LDFLAGS: -s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

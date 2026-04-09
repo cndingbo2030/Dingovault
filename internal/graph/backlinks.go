@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/domain"
 )
 
 // WikilinkLookupKeys returns normalized lookup strings that might appear in block_wikilinks.target

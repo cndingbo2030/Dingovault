@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/bus"
+	"github.com/cndingbo2030/dingovault/internal/bus"
 )
 
 // UpdateBlock replaces only the source lines for the given block and re-indexes the file.

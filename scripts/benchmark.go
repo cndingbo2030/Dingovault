@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dingbo/dingovault/internal/graph"
-	"github.com/dingbo/dingovault/internal/parser"
-	"github.com/dingbo/dingovault/internal/storage"
-	"github.com/dingbo/dingovault/internal/tenant"
+	"github.com/cndingbo2030/dingovault/internal/graph"
+	"github.com/cndingbo2030/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/storage"
+	"github.com/cndingbo2030/dingovault/internal/tenant"
 )
 
 const ftsSeedToken = "dvbenchtoken"

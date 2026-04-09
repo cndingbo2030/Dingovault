@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dingbo/dingovault/internal/domain"
-	"github.com/dingbo/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/parser"
 )
 
 // RemoteStore implements Provider by calling a Dingovault SaaS HTTP API (/api/v1).

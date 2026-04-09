@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"html"
 
-	"github.com/dingbo/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/parser"
 	"github.com/yuin/goldmark"
 )
 

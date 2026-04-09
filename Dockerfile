@@ -8,6 +8,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/dingovault ./cmd/dingovault
 
 FROM alpine:3.21
+LABEL org.opencontainers.image.source="https://github.com/cndingbo2030/dingovault"
 RUN apk add --no-cache ca-certificates tzdata \
 	&& addgroup -g 10001 -S dingovault \
 	&& adduser -u 10001 -S -G dingovault -h /var/lib/dingovault dingovault

@@ -3,7 +3,7 @@ package bridge
 import (
 	"sort"
 
-	"github.com/dingbo/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/domain"
 )
 
 // PageBlock is a block with nested children for the outliner UI.

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dingbo/dingovault/internal/tenant"
+	"github.com/cndingbo2030/dingovault/internal/tenant"
 )
 
 func TestStore_IndexStats_Empty(t *testing.T) {

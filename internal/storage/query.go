@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/domain"
 )
 
 var safePropKey = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)

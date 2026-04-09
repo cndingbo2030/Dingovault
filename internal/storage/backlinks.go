@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dingbo/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/domain"
 )
 
 // BlocksWithWikilinksToTargets returns distinct source blocks that link to any of the given targets

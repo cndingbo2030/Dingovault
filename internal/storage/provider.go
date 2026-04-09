@@ -3,8 +3,8 @@ package storage
 import (
 	"context"
 
-	"github.com/dingbo/dingovault/internal/domain"
-	"github.com/dingbo/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/parser"
 )
 
 // Provider abstracts vault index persistence so the local SQLite implementation can be swapped

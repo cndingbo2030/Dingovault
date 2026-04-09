@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/auth"
-	"github.com/dingbo/dingovault/internal/blob"
-	"github.com/dingbo/dingovault/internal/graph"
-	"github.com/dingbo/dingovault/internal/storage"
+	"github.com/cndingbo2030/dingovault/internal/auth"
+	"github.com/cndingbo2030/dingovault/internal/blob"
+	"github.com/cndingbo2030/dingovault/internal/graph"
+	"github.com/cndingbo2030/dingovault/internal/storage"
 )
 
 type captureBody struct {

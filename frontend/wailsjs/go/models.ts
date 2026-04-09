@@ -130,21 +130,32 @@ export namespace domain {
 
 export namespace storage {
 	
-	export class WikiGraphNode {
+	export class BlockSearchHit {
 	    id: string;
-	    label: string;
+	    sourcePath: string;
+	    content: string;
+	    lineStart: number;
+	    lineEnd: number;
+	    outlineLevel: number;
+	    snippet: string;
+	    rank: number;
 	
 	    static createFrom(source: any = {}) {
-	        return new WikiGraphNode(source);
+	        return new BlockSearchHit(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
-	        this.label = source["label"];
+	        this.sourcePath = source["sourcePath"];
+	        this.content = source["content"];
+	        this.lineStart = source["lineStart"];
+	        this.lineEnd = source["lineEnd"];
+	        this.outlineLevel = source["outlineLevel"];
+	        this.snippet = source["snippet"];
+	        this.rank = source["rank"];
 	    }
 	}
-	
 	export class WikiGraphEdge {
 	    source: string;
 	    target: string;
@@ -159,7 +170,20 @@ export namespace storage {
 	        this.target = source["target"];
 	    }
 	}
+	export class WikiGraphNode {
+	    id: string;
+	    label: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new WikiGraphNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	    }
+	}
 	export class WikiGraph {
 	    nodes: WikiGraphNode[];
 	    edges: WikiGraphEdge[];
@@ -192,33 +216,7 @@ export namespace storage {
 		    return a;
 		}
 	}
-
-	export class BlockSearchHit {
-	    id: string;
-	    sourcePath: string;
-	    content: string;
-	    lineStart: number;
-	    lineEnd: number;
-	    outlineLevel: number;
-	    snippet: string;
-	    rank: number;
 	
-	    static createFrom(source: any = {}) {
-	        return new BlockSearchHit(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.sourcePath = source["sourcePath"];
-	        this.content = source["content"];
-	        this.lineStart = source["lineStart"];
-	        this.lineEnd = source["lineEnd"];
-	        this.outlineLevel = source["outlineLevel"];
-	        this.snippet = source["snippet"];
-	        this.rank = source["rank"];
-	    }
-	}
 
 }
 

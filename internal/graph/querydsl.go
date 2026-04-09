@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/domain"
-	"github.com/dingbo/dingovault/internal/storage"
+	"github.com/cndingbo2030/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/storage"
 )
 
 // QueryBlocks interprets a small DSL:

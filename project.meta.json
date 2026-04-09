@@ -1,5 +1,5 @@
 {
-  "upstreamGitRemote": "https://github.com/cndingbo2030/Dingovault.git",
+  "upstreamGitRemote": "https://github.com/cndingbo2030/dingovault.git",
   "description": "Canonical upstream repository for Dingovault (CLI, Wails app, and future SaaS server).",
   "maintainer": "cndingbo2030",
   "contactEmail": "cndingbo@outlook.com"

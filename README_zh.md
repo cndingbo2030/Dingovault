@@ -2,7 +2,19 @@
 
 English | [中文](README_zh.md)
 
+[![Release](https://github.com/cndingbo2030/dingovault/actions/workflows/release.yml/badge.svg)](https://github.com/cndingbo2030/dingovault/actions)
+[![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **基于 Go 的高性能、本地优先大纲笔记系统，支持 SaaS 同步。**
+
+从源码安装 CLI / 服务端二进制：
+
+```bash
+go install github.com/cndingbo2030/dingovault/cmd/dingovault@latest
+```
+
+Go 模块路径：**`github.com/cndingbo2030/dingovault`**
 
 Dingovault 以 Markdown 块（block）为核心，提供 FTS5 全文搜索、双链、YAML Frontmatter 与桌面端体验。通过统一的 `storage.Provider` 抽象，同一套业务逻辑可运行在本地 SQLite 或远程 SaaS API。
 
@@ -46,4 +58,4 @@ wails dev
 
 - Maintainer: **cndingbo2030**
 - Email: **[cndingbo@outlook.com](mailto:cndingbo@outlook.com)**
-- Repo: [github.com/cndingbo2030/Dingovault](https://github.com/cndingbo2030/Dingovault)
+- Repo: [github.com/cndingbo2030/dingovault](https://github.com/cndingbo2030/dingovault)

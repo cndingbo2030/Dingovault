@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/storage"
+	"github.com/cndingbo2030/dingovault/internal/storage"
 )
 
 // ResolveWikilink returns the absolute path for a [[wikilink]] target: existing file, else alias match, else the default would-be path.

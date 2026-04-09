@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/domain"
-	"github.com/dingbo/dingovault/internal/parser"
-	"github.com/dingbo/dingovault/internal/tenant"
+	"github.com/cndingbo2030/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/tenant"
 )
 
 const idSep = "\x1e" // ASCII record separator — unlikely in vault paths / hashes

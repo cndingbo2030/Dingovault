@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dingbo/dingovault/internal/graph"
+	"github.com/cndingbo2030/dingovault/internal/graph"
 	"github.com/fsnotify/fsnotify"
 )
 

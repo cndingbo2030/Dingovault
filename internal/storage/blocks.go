@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dingbo/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/domain"
 )
 
 // GetBlockByID loads a single block row as domain.Block.

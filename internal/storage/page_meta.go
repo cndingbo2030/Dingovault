@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/parser"
 )
 
 // ResolveAliasToPath returns the absolute source_path for a wikilink-style target when it matches

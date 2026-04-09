@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dingbo/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/domain"
 )
 
 func TestEngine_WikilinksTagsAndBlocks(t *testing.T) {

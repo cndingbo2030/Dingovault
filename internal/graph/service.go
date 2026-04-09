@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dingbo/dingovault/internal/bus"
-	"github.com/dingbo/dingovault/internal/parser"
-	"github.com/dingbo/dingovault/internal/storage"
+	"github.com/cndingbo2030/dingovault/internal/bus"
+	"github.com/cndingbo2030/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/storage"
 )
 
 // Service applies parse results to a storage Provider (blocks + link/tag edges).

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/parser"
 )
 
 // ReplaceIndexedSource replaces blocks, wikilinks, tags, page_properties, and page_aliases

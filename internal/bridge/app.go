@@ -7,14 +7,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/config"
-	"github.com/dingbo/dingovault/internal/domain"
-	"github.com/dingbo/dingovault/internal/export"
-	"github.com/dingbo/dingovault/internal/graph"
-	"github.com/dingbo/dingovault/internal/locale"
-	"github.com/dingbo/dingovault/internal/storage"
-	"github.com/dingbo/dingovault/internal/tenant"
-	"github.com/dingbo/dingovault/internal/version"
+	"github.com/cndingbo2030/dingovault/internal/config"
+	"github.com/cndingbo2030/dingovault/internal/domain"
+	"github.com/cndingbo2030/dingovault/internal/export"
+	"github.com/cndingbo2030/dingovault/internal/graph"
+	"github.com/cndingbo2030/dingovault/internal/locale"
+	"github.com/cndingbo2030/dingovault/internal/storage"
+	"github.com/cndingbo2030/dingovault/internal/tenant"
+	"github.com/cndingbo2030/dingovault/internal/version"
 )
 
 // App is the Wails-facing API surface (bound to the frontend).

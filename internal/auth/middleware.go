@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dingbo/dingovault/internal/tenant"
+	"github.com/cndingbo2030/dingovault/internal/tenant"
 )
 
 type ctxKey int

@@ -1,4 +1,4 @@
-module github.com/dingbo/dingovault
+module github.com/cndingbo2030/dingovault
 
 go 1.25.0
 

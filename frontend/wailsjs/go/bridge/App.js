@@ -18,12 +18,12 @@ export function ExportPageHTML(arg1, arg2) {
   return window['go']['bridge']['App']['ExportPageHTML'](arg1, arg2);
 }
 
-export function GetBacklinks(arg1) {
-  return window['go']['bridge']['App']['GetBacklinks'](arg1);
-}
-
 export function GetAppVersion() {
   return window['go']['bridge']['App']['GetAppVersion']();
+}
+
+export function GetBacklinks(arg1) {
+  return window['go']['bridge']['App']['GetBacklinks'](arg1);
 }
 
 export function GetLocale() {
@@ -34,12 +34,12 @@ export function GetPage(arg1) {
   return window['go']['bridge']['App']['GetPage'](arg1);
 }
 
-export function GetWikiGraph() {
-  return window['go']['bridge']['App']['GetWikiGraph']();
-}
-
 export function GetTheme() {
   return window['go']['bridge']['App']['GetTheme']();
+}
+
+export function GetWikiGraph() {
+  return window['go']['bridge']['App']['GetWikiGraph']();
 }
 
 export function IndentBlock(arg1) {
@@ -70,24 +70,24 @@ export function QueryBlocks(arg1) {
   return window['go']['bridge']['App']['QueryBlocks'](arg1);
 }
 
-export function ResolveWikilink(arg1) {
-  return window['go']['bridge']['App']['ResolveWikilink'](arg1);
-}
-
 export function ReorderBlockBefore(arg1, arg2) {
   return window['go']['bridge']['App']['ReorderBlockBefore'](arg1, arg2);
+}
+
+export function ResolveWikilink(arg1) {
+  return window['go']['bridge']['App']['ResolveWikilink'](arg1);
 }
 
 export function SearchBlocks(arg1) {
   return window['go']['bridge']['App']['SearchBlocks'](arg1);
 }
 
-export function SetTheme(arg1) {
-  return window['go']['bridge']['App']['SetTheme'](arg1);
-}
-
 export function SetLocale(arg1) {
   return window['go']['bridge']['App']['SetLocale'](arg1);
+}
+
+export function SetTheme(arg1) {
+  return window['go']['bridge']['App']['SetTheme'](arg1);
 }
 
 export function Startup(arg1) {

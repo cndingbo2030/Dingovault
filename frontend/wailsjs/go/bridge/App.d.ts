@@ -13,17 +13,17 @@ export function EnsurePage(arg1:string):Promise<void>;
 
 export function ExportPageHTML(arg1:string,arg2:string):Promise<void>;
 
-export function GetBacklinks(arg1:string):Promise<Array<domain.Block>>;
-
 export function GetAppVersion():Promise<string>;
+
+export function GetBacklinks(arg1:string):Promise<Array<domain.Block>>;
 
 export function GetLocale():Promise<string>;
 
 export function GetPage(arg1:string):Promise<Array<bridge.PageBlock>>;
 
-export function GetWikiGraph():Promise<storage.WikiGraph>;
-
 export function GetTheme():Promise<string>;
+
+export function GetWikiGraph():Promise<storage.WikiGraph>;
 
 export function IndentBlock(arg1:string):Promise<void>;
 
@@ -39,15 +39,15 @@ export function OutdentBlock(arg1:string):Promise<void>;
 
 export function QueryBlocks(arg1:string):Promise<Array<domain.Block>>;
 
-export function ResolveWikilink(arg1:string):Promise<string>;
-
 export function ReorderBlockBefore(arg1:string,arg2:string):Promise<void>;
+
+export function ResolveWikilink(arg1:string):Promise<string>;
 
 export function SearchBlocks(arg1:string):Promise<Array<storage.BlockSearchHit>>;
 
-export function SetTheme(arg1:string):Promise<void>;
-
 export function SetLocale(arg1:string):Promise<void>;
+
+export function SetTheme(arg1:string):Promise<void>;
 
 export function Startup(arg1:context.Context):Promise<void>;
 
