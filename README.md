@@ -1,8 +1,16 @@
 # Dingovault
 
+[中文文档](README_zh.md) | English
+
 **High-performance, local-first outliner with SaaS sync, built in Go.**
 
 Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikilinks, YAML frontmatter, and a clean desktop shell. The same core runs **offline** against embedded **SQLite** or **online** against your **self-hosted or managed SaaS API**—switchable via a small `storage.Provider` abstraction.
+
+### Why teams pick Dingovault
+
+- **Go performance that feels instant:** real-world benchmark runs are commonly around **~1ms FTS query p50** and **~0.2ms page load p50** on warm local storage (machine-dependent; run `make benchmark` to measure your hardware).
+- **Secure by default:** optional **AES-256-GCM** encryption at rest (`DINGO_MASTER_KEY`) plus JWT-protected SaaS APIs for multi-user deployments.
+- **Plugin-ready architecture:** backend hooks (`before:block:save`, `after:block:indexed`) and frontend plugin slots make it easy to extend without forking core logic.
 
 ---
 
@@ -48,8 +56,8 @@ The **graph service** (`internal/graph`) and **Wails bridge** (`internal/bridge`
 
 ## Performance
 
-- **Local FTS**: prefix-token queries over FTS5 are typically **sub‑millisecond** on modest vaults after warmup; the included benchmark (`make benchmark`) stress-tests large trees.
-- **Page load**: serving a page’s block tree from SQLite is usually **well under a millisecond** of database work (UI and disk I/O add latency on top).
+- **Local FTS**: prefix-token queries over FTS5 are typically around **~1ms p50** on modest vaults after warmup.
+- **Page load**: serving one page’s block tree from SQLite is typically around **~0.2ms p50** of database work on warm local cache.
 
 Exact numbers depend on hardware, vault size, and OS cache—run `make benchmark` on your machine for a reproducible report.
 
@@ -63,6 +71,7 @@ Exact numbers depend on hardware, vault size, and OS cache—run `make benchmark
 - **SQLite `user_version`:** On open, `internal/storage/migrate.go` runs incremental migrations so upgrades can add tables/columns without wiping existing notes. Bump `CurrentSchemaVersion` and add a new step when the schema changes.
 - **`before:block:save`:** Register on the graph service’s `bus` with `RegisterBeforeBlockSave` to mutate markdown before it is written (e.g. auto-formatting, AI hooks). Errors abort the save.
 - **`after:block:indexed`:** Pub/sub topic `after:block:indexed` fires after a source is reindexed (alongside the existing file reindex topic).
+- **Reference AI plugin:** `internal/plugins/summarizer` subscribes to `after:block:indexed`; when a block includes `#summarize`, it appends a generated child summary and reindexes through `storage.Provider`.
 - **Desktop UI:** External scripts can call `window.__DINGOVAULT__.registerToolbarButton` / `registerSidebarSection` (see `frontend/src/pluginRegistry.js`). Missing images get a placeholder via `initImageFallback()`.
 
 ---

@@ -242,6 +242,15 @@
       }
     })()
 
+    try {
+      const cachedTheme = localStorage.getItem('dingovault-theme')
+      if (cachedTheme === 'light' || cachedTheme === 'dark') {
+        theme = cachedTheme
+      }
+    } catch {
+      // Ignore storage errors.
+    }
+
     GetTheme()
       .then((t) => {
         theme = t === 'light' ? 'light' : 'dark'
@@ -337,6 +346,11 @@
     const prev = theme
     const next = prev === 'dark' ? 'light' : 'dark'
     theme = next
+    try {
+      localStorage.setItem('dingovault-theme', next)
+    } catch {
+      // Ignore storage errors.
+    }
     try {
       await SetTheme(next)
     } catch (e) {

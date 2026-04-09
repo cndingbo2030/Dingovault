@@ -15,6 +15,7 @@ import (
 	"github.com/dingbo/dingovault/internal/graph"
 	"github.com/dingbo/dingovault/internal/onboarding"
 	"github.com/dingbo/dingovault/internal/parser"
+	"github.com/dingbo/dingovault/internal/plugins/summarizer"
 	"github.com/dingbo/dingovault/internal/scanner"
 	"github.com/dingbo/dingovault/internal/storage"
 	"github.com/dingbo/dingovault/internal/tenant"
@@ -98,7 +99,9 @@ func main() {
 
 	engine := parser.NewEngine()
 	graphSvc := graph.NewService(store, engine)
-	graphSvc.SetBus(bus.New())
+	eventBus := bus.New()
+	graphSvc.SetBus(eventBus)
+	_ = summarizer.Register(eventBus, store, engine)
 
 	idx, err := scanner.NewIndexer(notesPath, graphSvc)
 	if err != nil {
