@@ -13,9 +13,7 @@ import (
 // op: today | todo | h1 | h2 | h3 | code
 func (s *Service) ApplySlashOp(ctx context.Context, blockID, op string) error {
 	op = strings.ToLower(strings.TrimSpace(op))
-	switch op {
-	case "today", "todo", "h1", "h2", "h3", "code":
-	default:
+	if !validSlashOp(op) {
 		return fmt.Errorf("unknown slash op %q", op)
 	}
 
@@ -38,42 +36,9 @@ func (s *Service) ApplySlashOp(ctx context.Context, blockID, op string) error {
 		return fmt.Errorf("invalid line range %d-%d", ls, le)
 	}
 
-	first := strings.TrimRight(lines[ls-1], "\r")
-	prefix, body, _ := splitMarkdownPrefix(first)
-
-	switch op {
-	case "today":
-		d := time.Now().Format("2006-01-02")
-		rest := strings.TrimSpace(stripTodoLead(body))
-		var nb string
-		if rest == "" {
-			nb = d
-		} else {
-			nb = d + " " + rest
-		}
-		lines[ls-1] = prefix + nb
-	case "todo":
-		lines[ls-1] = prefix + forceTodoBody(body)
-	case "h1", "h2", "h3":
-		level := int(op[1] - '0')
-		if level < 1 || level > 3 {
-			return fmt.Errorf("invalid heading level")
-		}
-		title := strings.TrimSpace(stripTodoLead(body))
-		if title == "" {
-			title = " "
-		}
-		// Heading lines: no list indent preserved (zen outliner → top-level heading).
-		lines[ls-1] = strings.Repeat("#", level) + " " + title
-	case "code":
-		text := strings.TrimSpace(stripTodoLead(body))
-		if text == "" {
-			text = " "
-		}
-		newChunk := []string{"```", text, "```"}
-		lines = replaceLineRange(lines, ls, le, newChunk)
-	default:
-		return fmt.Errorf("unhandled op %q", op)
+	lines, err = applySlashOpToLines(lines, ls, le, op)
+	if err != nil {
+		return err
 	}
 
 	out := joinFileLines(lines, eol, trailingNL)
@@ -81,6 +46,67 @@ func (s *Service) ApplySlashOp(ctx context.Context, blockID, op string) error {
 		return fmt.Errorf("atomic write: %w", err)
 	}
 	return s.ReindexFile(ctx, path)
+}
+
+func validSlashOp(op string) bool {
+	switch op {
+	case "today", "todo", "h1", "h2", "h3", "code":
+		return true
+	default:
+		return false
+	}
+}
+
+func applySlashOpToLines(lines []string, ls, le int, op string) ([]string, error) {
+	first := strings.TrimRight(lines[ls-1], "\r")
+	prefix, body, _ := splitMarkdownPrefix(first)
+	switch op {
+	case "today":
+		lines[ls-1] = prefix + buildTodayBody(body)
+	case "todo":
+		lines[ls-1] = prefix + forceTodoBody(body)
+	case "h1", "h2", "h3":
+		line, err := buildHeadingLine(op, body)
+		if err != nil {
+			return nil, err
+		}
+		lines[ls-1] = line
+	case "code":
+		lines = replaceLineRange(lines, ls, le, buildCodeFenceChunk(body))
+	default:
+		return nil, fmt.Errorf("unhandled op %q", op)
+	}
+	return lines, nil
+}
+
+func buildTodayBody(body string) string {
+	d := time.Now().Format("2006-01-02")
+	rest := strings.TrimSpace(stripTodoLead(body))
+	if rest == "" {
+		return d
+	}
+	return d + " " + rest
+}
+
+func buildHeadingLine(op, body string) (string, error) {
+	level := int(op[1] - '0')
+	if level < 1 || level > 3 {
+		return "", fmt.Errorf("invalid heading level")
+	}
+	title := strings.TrimSpace(stripTodoLead(body))
+	if title == "" {
+		title = " "
+	}
+	// Heading lines: no list indent preserved (zen outliner → top-level heading).
+	return strings.Repeat("#", level) + " " + title, nil
+}
+
+func buildCodeFenceChunk(body string) []string {
+	text := strings.TrimSpace(stripTodoLead(body))
+	if text == "" {
+		text = " "
+	}
+	return []string{"```", text, "```"}
 }
 
 func replaceLineRange(lines []string, lineStart, lineEnd int, replacement []string) []string {

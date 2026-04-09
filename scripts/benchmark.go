@@ -23,68 +23,99 @@ import (
 const ftsSeedToken = "dvbenchtoken"
 
 func main() {
+	opts := parseBenchOptions()
+	runBenchmarkOrExit(opts)
+}
+
+type benchOptions struct {
+	dir    string
+	files  int
+	total  int
+	verify bool
+}
+
+func parseBenchOptions() benchOptions {
 	dirFlag := flag.String("dir", "", "vault directory (default: temp dir)")
 	nFiles := flag.Int("files", 50, "number of markdown files")
 	nTotal := flag.Int("total", 10000, "approximate total list items across all files")
 	verify := flag.Bool("verify", false, "verify indexed block round-trip (use with DINGO_MASTER_KEY for encryption stress check)")
 	flag.Parse()
+	return benchOptions{dir: *dirFlag, files: *nFiles, total: *nTotal, verify: *verify}
+}
 
-	dir := *dirFlag
-	if dir == "" {
-		d, err := os.MkdirTemp("", "dingovault-bench-*")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
-			os.Exit(1)
+func runBenchmarkOrExit(opts benchOptions) {
+	dir, cleanup := prepareBenchDir(opts.dir)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	perFile := max(1, opts.total/opts.files)
+	samplePath := generateBenchFilesOrExit(dir, opts.files, perFile)
+	store := openBenchStoreOrExit(filepath.Join(dir, "bench.db"))
+	defer func() { _ = store.Close() }()
+
+	ctx := tenant.WithUserID(context.Background(), tenant.LocalUserID)
+	indexMarkdownOrExit(ctx, store, dir, opts.files, perFile)
+	ftsDur := benchmarkFTSOrExit(ctx, store, ftsSeedToken, 80)
+	pageDur := benchmarkPageLoadOrExit(ctx, store, samplePath, perFile, 120)
+	reportLatencyNotes(ftsDur, pageDur)
+	if opts.verify {
+		runVerifyOrExit(ctx, store, samplePath, perFile)
+	}
+}
+
+func prepareBenchDir(dir string) (string, func()) {
+	if dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			exitf("mkdir: %v", err)
 		}
-		dir = d
-		defer func() { _ = os.RemoveAll(dir) }()
-	} else if err := os.MkdirAll(dir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
-		os.Exit(1)
+		return dir, nil
 	}
-
-	perFile := *nTotal / *nFiles
-	if perFile < 1 {
-		perFile = 1
+	d, err := os.MkdirTemp("", "dingovault-bench-*")
+	if err != nil {
+		exitf("mkdir: %v", err)
 	}
+	return d, func() { _ = os.RemoveAll(d) }
+}
 
+func generateBenchFilesOrExit(dir string, files, perFile int) string {
 	rng := rand.New(rand.NewPCG(1, 2))
 	words := []string{"alpha", "beta", "gamma", "delta", "omega", "note", "task", "idea", ftsSeedToken}
 	var samplePath string
-
-	for i := range *nFiles {
+	for i := range files {
 		name := filepath.Join(dir, fmt.Sprintf("bench-%02d.md", i))
-		var b strings.Builder
-		// List-only body avoids duplicate StableBlockID edge cases from heading+list overlaps in Goldmark.
-		for j := range perFile {
-			w := words[rng.IntN(len(words))]
-			fmt.Fprintf(&b, "- item %d %s %x\n", j, w, rng.Uint64()&0xfff)
-		}
-		if err := os.WriteFile(name, []byte(b.String()), 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "write %s: %v\n", name, err)
-			os.Exit(1)
+		if err := writeBenchFile(name, perFile, words, rng); err != nil {
+			exitf("write %s: %v", name, err)
 		}
 		if i == 0 {
 			samplePath = name
 		}
 	}
+	return samplePath
+}
 
-	dbPath := filepath.Join(dir, "bench.db")
-	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "remove db: %v\n", err)
-		os.Exit(1)
+func writeBenchFile(name string, perFile int, words []string, rng *rand.Rand) error {
+	var b strings.Builder
+	// List-only body avoids duplicate StableBlockID edge cases from heading+list overlaps in Goldmark.
+	for j := range perFile {
+		w := words[rng.IntN(len(words))]
+		fmt.Fprintf(&b, "- item %d %s %x\n", j, w, rng.Uint64()&0xfff)
 	}
+	return os.WriteFile(name, []byte(b.String()), 0o644)
+}
 
+func openBenchStoreOrExit(dbPath string) *storage.Store {
+	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
+		exitf("remove db: %v", err)
+	}
 	store, err := storage.OpenSQLite(dbPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "sqlite: %v\n", err)
-		os.Exit(1)
+		exitf("sqlite: %v", err)
 	}
-	defer func() { _ = store.Close() }()
+	return store
+}
 
+func indexMarkdownOrExit(ctx context.Context, store *storage.Store, dir string, files, perFile int) {
 	g := graph.NewService(store, parser.NewEngine())
-	ctx := tenant.WithUserID(context.Background(), tenant.LocalUserID)
-
 	t0 := time.Now()
 	if err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.EqualFold(filepath.Ext(path), ".md") {
@@ -92,39 +123,39 @@ func main() {
 		}
 		return g.ReindexFile(ctx, path)
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "index: %v\n", err)
-		os.Exit(1)
+		exitf("index: %v", err)
 	}
-	fmt.Printf("Indexed %d files (~%d blocks) in %s\n", *nFiles, perFile**nFiles, time.Since(t0).Round(time.Millisecond))
+	fmt.Printf("Indexed %d files (~%d blocks) in %s\n", files, perFile*files, time.Since(t0).Round(time.Millisecond))
+}
 
-	query := ftsSeedToken
-	const ftsRuns = 80
+func benchmarkFTSOrExit(ctx context.Context, store *storage.Store, query string, runs int) []time.Duration {
 	var ftsDur []time.Duration
-	for range ftsRuns {
+	for range runs {
 		t1 := time.Now()
-		_, err := store.SearchBlocksFTS(ctx, query, 50)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "fts: %v\n", err)
-			os.Exit(1)
+		if _, err := store.SearchBlocksFTS(ctx, query, 50); err != nil {
+			exitf("fts: %v", err)
 		}
 		ftsDur = append(ftsDur, time.Since(t1))
 	}
-	fmt.Printf("SearchBlocks FTS %q: p50=%s p95=%s (n=%d)\n", query, percentile(ftsDur, 50), percentile(ftsDur, 95), ftsRuns)
+	fmt.Printf("SearchBlocks FTS %q: p50=%s p95=%s (n=%d)\n", query, percentile(ftsDur, 50), percentile(ftsDur, 95), runs)
+	return ftsDur
+}
 
-	const pageRuns = 120
+func benchmarkPageLoadOrExit(ctx context.Context, store *storage.Store, samplePath string, perFile, runs int) []time.Duration {
 	var pageDur []time.Duration
-	for range pageRuns {
+	for range runs {
 		t1 := time.Now()
-		_, err := store.ListDomainBlocksBySourcePath(ctx, samplePath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "getpage: %v\n", err)
-			os.Exit(1)
+		if _, err := store.ListDomainBlocksBySourcePath(ctx, samplePath); err != nil {
+			exitf("getpage: %v", err)
 		}
 		pageDur = append(pageDur, time.Since(t1))
 	}
 	fmt.Printf("ListDomainBlocksBySourcePath (1 file, ~%d blocks): p50=%s p95=%s (n=%d)\n",
-		perFile, percentile(pageDur, 50), percentile(pageDur, 95), pageRuns)
+		perFile, percentile(pageDur, 50), percentile(pageDur, 95), runs)
+	return pageDur
+}
 
+func reportLatencyNotes(ftsDur, pageDur []time.Duration) {
 	slow := false
 	if p50 := parseDurMs(percentile(ftsDur, 50)); p50 > 50 {
 		fmt.Println("NOTE: FTS p50 > 50ms — consider PRAGMA optimize; ensure WAL; warm OS page cache.")
@@ -137,18 +168,22 @@ func main() {
 	if !slow {
 		fmt.Println("All measured p50 latencies are ≤ 50ms on this machine.")
 	}
+}
 
-	if *verify {
-		if err := verifyIndexedBlocks(ctx, store, samplePath, perFile); err != nil {
-			fmt.Fprintf(os.Stderr, "verify: %v\n", err)
-			os.Exit(1)
-		}
-		if os.Getenv("DINGO_MASTER_KEY") != "" {
-			fmt.Println("Encryption verify OK (DINGO_MASTER_KEY): decrypted block content matches indexed markdown.")
-		} else {
-			fmt.Println("Verify OK: sampled blocks readable from index.")
-		}
+func runVerifyOrExit(ctx context.Context, store *storage.Store, samplePath string, perFile int) {
+	if err := verifyIndexedBlocks(ctx, store, samplePath, perFile); err != nil {
+		exitf("verify: %v", err)
 	}
+	if os.Getenv("DINGO_MASTER_KEY") != "" {
+		fmt.Println("Encryption verify OK (DINGO_MASTER_KEY): decrypted block content matches indexed markdown.")
+	} else {
+		fmt.Println("Verify OK: sampled blocks readable from index.")
+	}
+}
+
+func exitf(format string, a ...any) {
+	fmt.Fprintf(os.Stderr, format+"\n", a...)
+	os.Exit(1)
 }
 
 func verifyIndexedBlocks(ctx context.Context, store *storage.Store, samplePath string, perFile int) error {

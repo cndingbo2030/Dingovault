@@ -27,60 +27,10 @@ Intro paragraph with [[Target Page|shown]] and #vault #go-lang.
 	if len(res.Blocks) < 4 {
 		t.Fatalf("expected several blocks, got %d", len(res.Blocks))
 	}
-
-	var titles, intros, items int
-	for _, b := range res.Blocks {
-		switch {
-		case strings.HasPrefix(b.Content, "Title"):
-			titles++
-			if b.Metadata.LineStart < 1 {
-				t.Errorf("heading line: %+v", b.Metadata)
-			}
-		case strings.HasPrefix(b.Content, "Intro"):
-			intros++
-		case strings.HasPrefix(b.Content, "First"):
-			items++
-		case strings.HasPrefix(b.Content, "Second"):
-			items++
-		case strings.HasPrefix(b.Content, "Nested"):
-			items++
-		}
-	}
-	if titles != 1 || intros != 1 || items != 3 {
-		t.Fatalf("block kind counts titles=%d intros=%d items=%d", titles, intros, items)
-	}
-
-	var targets []string
-	for _, w := range res.Wikilinks {
-		targets = append(targets, w.Target)
-	}
-	if !contains(targets, "Target Page") || !contains(targets, "Bare") {
-		t.Fatalf("wikilinks: %+v", res.Wikilinks)
-	}
-
-	tags := map[string]bool{}
-	for _, tg := range res.Tags {
-		tags[tg.Tag] = true
-	}
-	for _, need := range []string{"vault", "go-lang", "itemtag"} {
-		if !tags[need] {
-			t.Fatalf("missing tag %q in %+v", need, res.Tags)
-		}
-	}
-
-	var nested *domain.Block
-	for i := range res.Blocks {
-		if strings.HasPrefix(res.Blocks[i].Content, "Nested") {
-			nested = &res.Blocks[i]
-			break
-		}
-	}
-	if nested == nil {
-		t.Fatal("nested block not found")
-	}
-	if nested.ParentID == "" {
-		t.Fatal("nested list item should have ParentID set")
-	}
+	assertBlockKinds(t, res.Blocks)
+	assertWikilinks(t, res)
+	assertTags(t, res)
+	assertNestedParentID(t, res.Blocks)
 }
 
 func TestEngine_ListItemsHaveDistinctIDs(t *testing.T) {
@@ -112,6 +62,68 @@ func contains(xs []string, v string) bool {
 		}
 	}
 	return false
+}
+
+func assertBlockKinds(t *testing.T, blocks []domain.Block) {
+	t.Helper()
+	var titles, intros, items int
+	for _, b := range blocks {
+		switch {
+		case strings.HasPrefix(b.Content, "Title"):
+			titles++
+			if b.Metadata.LineStart < 1 {
+				t.Errorf("heading line: %+v", b.Metadata)
+			}
+		case strings.HasPrefix(b.Content, "Intro"):
+			intros++
+		case strings.HasPrefix(b.Content, "First"), strings.HasPrefix(b.Content, "Second"), strings.HasPrefix(b.Content, "Nested"):
+			items++
+		}
+	}
+	if titles != 1 || intros != 1 || items != 3 {
+		t.Fatalf("block kind counts titles=%d intros=%d items=%d", titles, intros, items)
+	}
+}
+
+func assertWikilinks(t *testing.T, res ParseResult) {
+	t.Helper()
+	var targets []string
+	for _, w := range res.Wikilinks {
+		targets = append(targets, w.Target)
+	}
+	if !contains(targets, "Target Page") || !contains(targets, "Bare") {
+		t.Fatalf("wikilinks: %+v", res.Wikilinks)
+	}
+}
+
+func assertTags(t *testing.T, res ParseResult) {
+	t.Helper()
+	tags := map[string]bool{}
+	for _, tg := range res.Tags {
+		tags[tg.Tag] = true
+	}
+	for _, need := range []string{"vault", "go-lang", "itemtag"} {
+		if !tags[need] {
+			t.Fatalf("missing tag %q in %+v", need, res.Tags)
+		}
+	}
+}
+
+func assertNestedParentID(t *testing.T, blocks []domain.Block) {
+	t.Helper()
+	var nested *domain.Block
+	for i := range blocks {
+		if strings.HasPrefix(blocks[i].Content, "Nested") {
+			nested = &blocks[i]
+			break
+		}
+	}
+	if nested == nil {
+		t.Fatal("nested block not found")
+	}
+	if nested.ParentID == "" {
+		t.Fatal("nested list item should have ParentID set")
+	}
 }
 
 func BenchmarkParse1000SmallFiles(b *testing.B) {

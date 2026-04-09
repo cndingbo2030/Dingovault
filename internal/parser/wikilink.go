@@ -23,48 +23,62 @@ func (w *wikilinkParser) Trigger() []byte {
 func (w *wikilinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Context) ast.Node {
 	savedLine, savedPos := block.Position()
 	line, _ := block.PeekLine()
-	if line == nil || len(line) < 2 || line[0] != '[' || line[1] != '[' {
+	if !startsWikilink(line) {
 		return nil
 	}
 
 	block.Advance(2)
 	line, _ = block.PeekLine()
 	if line == nil {
-		block.SetPosition(savedLine, savedPos)
-		return nil
+		return rollback(block, savedLine, savedPos)
 	}
 
-	closeIdx := -1
-	for i := 0; i < len(line)-1; i++ {
-		if line[i] == ']' && line[i+1] == ']' {
-			// Skip escaped ] — uncommon inside wikilinks; respect backslash escape
-			if i > 0 && line[i-1] == '\\' {
-				esc := 0
-				for j := i - 1; j >= 0 && line[j] == '\\'; j-- {
-					esc++
-				}
-				if esc%2 == 1 {
-					continue
-				}
-			}
-			closeIdx = i
-			break
-		}
-	}
+	closeIdx := findWikilinkClose(line)
 	if closeIdx < 0 {
-		block.SetPosition(savedLine, savedPos)
-		return nil
+		return rollback(block, savedLine, savedPos)
 	}
 
 	inner := line[:closeIdx]
 	target, alias := splitWikilinkInner(inner)
 	if len(target) == 0 {
-		block.SetPosition(savedLine, savedPos)
-		return nil
+		return rollback(block, savedLine, savedPos)
 	}
 
 	block.Advance(closeIdx + 2)
 	return NewWikilink(target, alias)
+}
+
+func startsWikilink(line []byte) bool {
+	return line != nil && len(line) >= 2 && line[0] == '[' && line[1] == '['
+}
+
+func rollback(block text.Reader, savedLine int, savedPos text.Segment) ast.Node {
+	block.SetPosition(savedLine, savedPos)
+	return nil
+}
+
+func findWikilinkClose(line []byte) int {
+	for i := 0; i < len(line)-1; i++ {
+		if line[i] != ']' || line[i+1] != ']' {
+			continue
+		}
+		if isEscapedBracket(line, i) {
+			continue
+		}
+		return i
+	}
+	return -1
+}
+
+func isEscapedBracket(line []byte, idx int) bool {
+	if idx <= 0 || line[idx-1] != '\\' {
+		return false
+	}
+	esc := 0
+	for j := idx - 1; j >= 0 && line[j] == '\\'; j-- {
+		esc++
+	}
+	return esc%2 == 1
 }
 
 func splitWikilinkInner(inner []byte) (target, alias []byte) {
