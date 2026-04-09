@@ -90,6 +90,11 @@ jobs:
   wails-macos:
     needs: test
     runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+          - arch: arm64
     env:
       GO_LDFLAGS: -s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${{ github.ref_name }}
     steps:
@@ -105,13 +110,13 @@ jobs:
       - name: Build desktop (macOS)
         run: |
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-          wails build -platform darwin/universal -o Dingovault -ldflags "${GO_LDFLAGS}"
+          wails build -platform darwin/${{ matrix.arch }} -o Dingovault -ldflags "${GO_LDFLAGS}"
       - name: Pack
-        run: cd build/bin && zip -r ../../dingovault-${{ github.ref_name }}-macos-universal.zip Dingovault.app
+        run: cd build/bin && zip -r ../../dingovault-${{ github.ref_name }}-darwin-${{ matrix.arch }}.zip Dingovault.app
       - uses: actions/upload-artifact@v4
         with:
-          name: wails-macos-universal
-          path: dingovault-${{ github.ref_name }}-macos-universal.zip
+          name: wails-macos-${{ matrix.arch }}
+          path: dingovault-${{ github.ref_name }}-darwin-${{ matrix.arch }}.zip
 
   wails-windows:
     needs: test
@@ -184,7 +189,8 @@ jobs:
           cp artifacts/server-darwin-amd64/dingovault-${{ github.ref_name }}-darwin-amd64 upload/
           cp artifacts/server-darwin-arm64/dingovault-${{ github.ref_name }}-darwin-arm64 upload/
           cp artifacts/wails-linux-amd64/dingovault-${{ github.ref_name }}-linux-amd64.tar.gz upload/
-          cp artifacts/wails-macos-universal/dingovault-${{ github.ref_name }}-macos-universal.zip upload/
+          cp artifacts/wails-macos-amd64/dingovault-${{ github.ref_name }}-darwin-amd64.zip upload/
+          cp artifacts/wails-macos-arm64/dingovault-${{ github.ref_name }}-darwin-arm64.zip upload/
           cp artifacts/wails-windows-amd64/dingovault.exe upload/dingovault-${{ github.ref_name }}-windows-amd64-wails.exe
 
       - name: Generate checksums
