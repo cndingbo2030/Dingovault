@@ -22,6 +22,12 @@ type SyncSettingsDTO struct {
 	WebDAVRemoteRoot string `json:"webdavRemoteRoot"`
 	PairingPort      int    `json:"pairingPort"`
 	LANInstanceName  string `json:"lanInstanceName"`
+	S3Region         string `json:"s3Region"`
+	S3Bucket         string `json:"s3Bucket"`
+	S3Prefix         string `json:"s3Prefix"`
+	S3AccessKey      string `json:"s3AccessKey"`
+	S3SecretKey      string `json:"s3SecretKey"`
+	S3Endpoint       string `json:"s3Endpoint"`
 }
 
 // LANPeerDTO is one discovered Dingovault instance on the LAN.
@@ -41,6 +47,12 @@ func syncDTOFromConfig(s config.SyncSettings) SyncSettingsDTO {
 		WebDAVRemoteRoot: s.WebDAVRemoteRoot,
 		PairingPort:      s.PairingPort,
 		LANInstanceName:  s.LANInstanceName,
+		S3Region:         s.S3Region,
+		S3Bucket:         s.S3Bucket,
+		S3Prefix:         s.S3Prefix,
+		S3AccessKey:      s.S3AccessKey,
+		S3SecretKey:      s.S3SecretKey,
+		S3Endpoint:       s.S3Endpoint,
 	}
 }
 
@@ -52,6 +64,12 @@ func syncDTOToConfig(d SyncSettingsDTO) config.SyncSettings {
 		WebDAVRemoteRoot: strings.TrimSpace(d.WebDAVRemoteRoot),
 		PairingPort:      d.PairingPort,
 		LANInstanceName:  strings.TrimSpace(d.LANInstanceName),
+		S3Region:         strings.TrimSpace(d.S3Region),
+		S3Bucket:         strings.TrimSpace(d.S3Bucket),
+		S3Prefix:         strings.TrimSpace(d.S3Prefix),
+		S3AccessKey:      strings.TrimSpace(d.S3AccessKey),
+		S3SecretKey:      d.S3SecretKey,
+		S3Endpoint:       strings.TrimSpace(d.S3Endpoint),
 	}
 }
 
@@ -74,6 +92,9 @@ func (a *App) SetSyncSettings(dto SyncSettingsDTO) error {
 	next := syncDTOToConfig(dto)
 	if strings.TrimSpace(dto.WebDAVPassword) == "" {
 		next.WebDAVPassword = prev.WebDAVPassword
+	}
+	if strings.TrimSpace(dto.S3SecretKey) == "" {
+		next.S3SecretKey = prev.S3SecretKey
 	}
 	c.Sync = config.NormalizeSyncSettings(next)
 	return config.Save(c)
@@ -106,6 +127,37 @@ func (a *App) SyncVaultWebDAV() error {
 		return err
 	}
 	// Re-read files from disk into the index after remote pulls.
+	return a.reindexVaultMarkdown()
+}
+
+// SyncVaultS3 performs a bidirectional .md sync with the configured S3 bucket (or S3-compatible API).
+func (a *App) SyncVaultS3() error {
+	if a.notesRoot == "" {
+		return fmt.Errorf("%s", a.t(locale.ErrNotesRootNotSet))
+	}
+	c, err := config.Load()
+	if err != nil {
+		return err
+	}
+	s := config.NormalizeSyncSettings(c.Sync)
+	if strings.TrimSpace(s.S3Bucket) == "" {
+		return fmt.Errorf("s3 bucket not configured")
+	}
+	cfg := vaultsync.S3Config{
+		Region:    s.S3Region,
+		Bucket:    s.S3Bucket,
+		Prefix:    s.S3Prefix,
+		AccessKey: s.S3AccessKey,
+		SecretKey: s.S3SecretKey,
+		Endpoint:  s.S3Endpoint,
+	}
+	ctx := context.Background()
+	if a.ctx != nil {
+		ctx = a.ctx
+	}
+	if err := vaultsync.SyncMarkdownVaultS3(ctx, a.notesRoot, cfg); err != nil {
+		return err
+	}
 	return a.reindexVaultMarkdown()
 }
 
@@ -173,6 +225,12 @@ func (a *App) StartLANSyncAdvertise() (string, error) {
 		WebDAVUser:       s.WebDAVUser,
 		WebDAVPassword:   s.WebDAVPassword,
 		WebDAVRemoteRoot: s.WebDAVRemoteRoot,
+		S3Region:         s.S3Region,
+		S3Bucket:         s.S3Bucket,
+		S3Prefix:         s.S3Prefix,
+		S3AccessKey:      s.S3AccessKey,
+		S3SecretKey:      s.S3SecretKey,
+		S3Endpoint:       s.S3Endpoint,
 	}
 	pin, stop, err := network.StartPINAdvertiser(context.Background(), name, s.PairingPort, cred)
 	if err != nil {
@@ -195,7 +253,7 @@ func (a *App) StopLANSyncAdvertise() {
 	}
 }
 
-// PairLANSyncWith connects to a peer, verifies the PIN, and stores received WebDAV settings locally.
+// PairLANSyncWith connects to a peer, verifies the PIN, and stores received sync settings (WebDAV and optional S3) locally.
 func (a *App) PairLANSyncWith(host string, port int, pin string) error {
 	host = strings.TrimSpace(host)
 	if host == "" {
@@ -217,6 +275,12 @@ func (a *App) PairLANSyncWith(host string, port int, pin string) error {
 		WebDAVUser:       cred.WebDAVUser,
 		WebDAVPassword:   cred.WebDAVPassword,
 		WebDAVRemoteRoot: cred.WebDAVRemoteRoot,
+		S3Region:         cred.S3Region,
+		S3Bucket:         cred.S3Bucket,
+		S3Prefix:         cred.S3Prefix,
+		S3AccessKey:      cred.S3AccessKey,
+		S3SecretKey:      cred.S3SecretKey,
+		S3Endpoint:       cred.S3Endpoint,
 		PairingPort:      prev.PairingPort,
 		LANInstanceName:  prev.LANInstanceName,
 	})

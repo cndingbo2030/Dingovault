@@ -2,6 +2,18 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
+## v1.3.2 — S3-compatible sync & richer LAN pairing (2026-04-10)
+
+### Object storage sync
+
+Sync your vault to **Amazon S3** or any **S3-compatible** endpoint (for example MinIO) with the same bidirectional Markdown rules as WebDAV: newer-or-larger wins, and true conflicts become a `*.conflict.md` file next to the original.
+
+### LAN pairing carries more settings
+
+When you pair with a 4-digit PIN on a trusted Wi‑Fi, the other device can now receive **WebDAV and S3** fields you have configured, so multi-cloud setups propagate in one step.
+
+---
+
 ## v1.3.1 — Stable sync & LAN discovery (2026-04-10)
 
 ### Keep the same vault on every device

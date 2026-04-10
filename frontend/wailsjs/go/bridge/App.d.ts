@@ -79,4 +79,6 @@ export function SuggestTagsForBlock(arg1:string):Promise<Array<string>>;
 
 export function SyncVaultWebDAV():Promise<void>;
 
+export function SyncVaultS3():Promise<void>;
+
 export function UpdateBlock(arg1:string,arg2:string):Promise<void>;

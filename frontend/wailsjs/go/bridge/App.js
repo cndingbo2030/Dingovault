@@ -150,6 +150,10 @@ export function SyncVaultWebDAV() {
   return window['go']['bridge']['App']['SyncVaultWebDAV']();
 }
 
+export function SyncVaultS3() {
+  return window['go']['bridge']['App']['SyncVaultS3']();
+}
+
 export function UpdateBlock(arg1, arg2) {
   return window['go']['bridge']['App']['UpdateBlock'](arg1, arg2);
 }

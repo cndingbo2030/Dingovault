@@ -39,6 +39,13 @@ type SyncSettings struct {
 	AdvertiseLAN bool `json:"advertiseLan,omitempty"`
 	// LANInstanceName is shown to other devices (default: hostname).
 	LANInstanceName string `json:"lanInstanceName,omitempty"`
+	// S3* configures optional bucket sync (AWS S3 or S3-compatible endpoints such as MinIO).
+	S3Region    string `json:"s3Region,omitempty"`
+	S3Bucket    string `json:"s3Bucket,omitempty"`
+	S3Prefix    string `json:"s3Prefix,omitempty"`
+	S3AccessKey string `json:"s3AccessKey,omitempty"`
+	S3SecretKey string `json:"s3SecretKey,omitempty"`
+	S3Endpoint  string `json:"s3Endpoint,omitempty"`
 }
 
 // AISettings is persisted in config.json alongside vault preferences.

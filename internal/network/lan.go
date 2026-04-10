@@ -17,85 +17,18 @@ import (
 	"github.com/hashicorp/mdns"
 )
 
-// DingovaultService is the mDNS service type for peer discovery.
-const DingovaultService = "_dingovault._tcp"
-
-// Peer is one discovered instance on the LAN.
-type Peer struct {
-	Name string   `json:"name"`
-	Host string   `json:"host"`
-	IP   string   `json:"ip"`
-	Port int      `json:"port"`
-	TXT  []string `json:"txt,omitempty"`
-}
-
 // PairingCredentials is exchanged after a successful PIN check (plaintext on LAN — use only on trusted networks).
 type PairingCredentials struct {
 	WebDAVURL        string `json:"webdavUrl"`
 	WebDAVUser       string `json:"webdavUser"`
 	WebDAVPassword   string `json:"webdavPassword"`
 	WebDAVRemoteRoot string `json:"webdavRemoteRoot,omitempty"`
-}
-
-// BrowseDingovaultPeers runs a short mDNS query for other Dingovault advertisers.
-func BrowseDingovaultPeers(ctx context.Context, timeout time.Duration) ([]Peer, error) {
-	if timeout <= 0 {
-		timeout = 2 * time.Second
-	}
-	entries := make(chan *mdns.ServiceEntry, 32)
-	params := &mdns.QueryParam{
-		Service:             DingovaultService,
-		Domain:              "local",
-		Timeout:             timeout,
-		Entries:             entries,
-		WantUnicastResponse: true,
-	}
-	go func() { _ = mdns.QueryContext(ctx, params) }()
-
-	merge := func(e *mdns.ServiceEntry, seen map[string]Peer) {
-		if e == nil {
-			return
-		}
-		ip := ""
-		if e.AddrV4 != nil {
-			ip = e.AddrV4.String()
-		} else if e.Addr != nil {
-			ip = e.Addr.String()
-		}
-		if ip == "" || e.Port <= 0 {
-			return
-		}
-		key := ip + ":" + fmt.Sprint(e.Port)
-		seen[key] = Peer{
-			Name: strings.TrimSuffix(e.Name, "."),
-			Host: e.Host,
-			IP:   ip,
-			Port: e.Port,
-			TXT:  append([]string(nil), e.InfoFields...),
-		}
-	}
-
-	seen := make(map[string]Peer)
-	deadline := time.NewTimer(timeout + 400*time.Millisecond)
-	defer deadline.Stop()
-	for {
-		select {
-		case e := <-entries:
-			merge(e, seen)
-		case <-deadline.C:
-			out := make([]Peer, 0, len(seen))
-			for _, p := range seen {
-				out = append(out, p)
-			}
-			return out, nil
-		case <-ctx.Done():
-			out := make([]Peer, 0, len(seen))
-			for _, p := range seen {
-				out = append(out, p)
-			}
-			return out, ctx.Err()
-		}
-	}
+	S3Region         string `json:"s3Region,omitempty"`
+	S3Bucket         string `json:"s3Bucket,omitempty"`
+	S3Prefix         string `json:"s3Prefix,omitempty"`
+	S3AccessKey      string `json:"s3AccessKey,omitempty"`
+	S3SecretKey      string `json:"s3SecretKey,omitempty"`
+	S3Endpoint       string `json:"s3Endpoint,omitempty"`
 }
 
 // StartPINAdvertiser listens for pairing connections, publishes mDNS, and returns a 4-digit PIN.
@@ -178,7 +111,7 @@ func handlePairingConn(conn net.Conn, expectedPin string, cred PairingCredential
 	}
 }
 
-// PairWithPeer connects to a discovered host, sends the PIN, and decodes WebDAV credentials.
+// PairWithPeer connects to a discovered host, sends the PIN, and decodes sync credentials (WebDAV and optional S3).
 func PairWithPeer(ctx context.Context, host string, port int, pin string) (PairingCredentials, error) {
 	var zero PairingCredentials
 	if port <= 0 {

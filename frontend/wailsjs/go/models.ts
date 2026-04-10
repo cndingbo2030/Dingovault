@@ -95,6 +95,12 @@ export namespace bridge {
 	    webdavRemoteRoot: string;
 	    pairingPort: number;
 	    lanInstanceName: string;
+	    s3Region: string;
+	    s3Bucket: string;
+	    s3Prefix: string;
+	    s3AccessKey: string;
+	    s3SecretKey: string;
+	    s3Endpoint: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SyncSettingsDTO(source);
@@ -108,6 +114,12 @@ export namespace bridge {
 	        this.webdavRemoteRoot = source["webdavRemoteRoot"];
 	        this.pairingPort = source["pairingPort"];
 	        this.lanInstanceName = source["lanInstanceName"];
+	        this.s3Region = source["s3Region"];
+	        this.s3Bucket = source["s3Bucket"];
+	        this.s3Prefix = source["s3Prefix"];
+	        this.s3AccessKey = source["s3AccessKey"];
+	        this.s3SecretKey = source["s3SecretKey"];
+	        this.s3Endpoint = source["s3Endpoint"];
 	    }
 	}
 	export class LANPeerDTO {
