@@ -47,6 +47,8 @@ jobs:
         with:
           context: .
           push: true
+          provenance: false
+          sbom: false
           tags: |
             ${{ steps.ghcr.outputs.image }}:${{ github.ref_name }}
             ${{ steps.ghcr.outputs.image }}:latest
@@ -350,6 +352,15 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: server-*
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: wails-*
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          name: android-mobile
 
       - name: Flatten for upload (semantic filenames)
         run: |
