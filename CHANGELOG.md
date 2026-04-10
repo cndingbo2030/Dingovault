@@ -2,6 +2,22 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
+## v1.4.1 — Release workflow healing & semantic download names (2026-04-10)
+
+### CI / Android
+
+GitHub Actions **release** builds set **ANDROID_HOME**, **ANDROID_NDK_HOME**, **NDK_HOME**, pin **cmdline-tools** for `setup-android`, install the **NDK** via the action’s package list, add a **`ndk-bundle` symlink** for gomobile, and run **`gomobile init` only after** the NDK is present. **Gradle `gradlew`** is explicitly **`chmod +x`**.
+
+### Downloads
+
+Release assets use **long, self-describing filenames** (for example **Apple Silicon** vs **Intel**, **Linux Desktop** `.tar.gz`, **Windows 64-bit Installer**, **Android Mobile Phone Tablet** `.apk`) so the right file is obvious. See the **`Makefile`** `RELEASE_*` variables and **`make release-names`** for the canonical list.
+
+### UI
+
+**Viewport-fit=cover**, stronger **safe-area** padding for notches and **Android gesture bars**, and a **chrome layout** mode that adjusts the **header** for tablet-landscape vs phone portrait.
+
+---
+
 ## v1.4.0 — Android build pipeline & mobile-ready UI (2026-04-10)
 
 ### Android (gomobile)

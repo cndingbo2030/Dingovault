@@ -77,6 +77,24 @@
   let sideTab = 'backlinks'
   /** @type {'outline' | 'related' | 'side'} */
   let mobilePanel = 'outline'
+  /** @type {'default' | 'phone-portrait' | 'phone-land' | 'tablet-land'} */
+  let chromeMode = 'default'
+
+  function syncChromeMode() {
+    if (typeof window === 'undefined') return
+    const w = window.innerWidth
+    const h = window.innerHeight
+    const land = w >= h
+    if (land && w >= 600) {
+      chromeMode = 'tablet-land'
+    } else if (!land && w <= 639) {
+      chromeMode = 'phone-portrait'
+    } else if (land && w < 600) {
+      chromeMode = 'phone-land'
+    } else {
+      chromeMode = 'default'
+    }
+  }
   /** @type {string} */
   let appVersion = ''
   /** @type {{ nodes: { id: string, label: string }[], edges: { source: string, target: string }[] }} */
@@ -252,6 +270,12 @@
   onMount(() => {
     document.documentElement.style.setProperty('--dv-font', "var(--dv-font-sans, 'Inter', system-ui, sans-serif)")
 
+    syncChromeMode()
+    const ro =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => syncChromeMode()) : null
+    ro?.observe(document.documentElement)
+    window.addEventListener('orientationchange', syncChromeMode)
+
     void (async () => {
       try {
         let loc = await GetLocale()
@@ -333,7 +357,11 @@
       if (e.key === 'Escape') paletteOpen = false
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('orientationchange', syncChromeMode)
+      ro?.disconnect()
+    }
   })
 
   /**
@@ -531,7 +559,7 @@
   }
 </script>
 
-<main class="layout zen">
+<main class="layout zen" data-chrome-mode={chromeMode}>
   <nav class="breadcrumbs" class:index-pulse={indexPulse} aria-label={T('app.breadcrumb')}>
     <span class="crumb vault">{vaultBasename(notesRoot)}</span>
     {#if breadcrumbSegments.length > 1}
@@ -615,7 +643,7 @@
           <div class="about-logo">D</div>
         </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.4.0'}</p>
+        <p class="about-ver">{appVersion || 'v1.4.1'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>
@@ -930,8 +958,40 @@
     max-width: 800px;
     width: 100%;
     margin: 0 auto;
-    padding: 20px max(16px, env(safe-area-inset-left)) 56px max(16px, env(safe-area-inset-right));
+    padding: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-left, 0px))
+      max(56px, calc(12px + env(safe-area-inset-bottom, 0px))) max(16px, env(safe-area-inset-right, 0px));
     box-sizing: border-box;
+  }
+  .top {
+    padding-left: max(0px, env(safe-area-inset-left, 0px));
+    padding-right: max(0px, env(safe-area-inset-right, 0px));
+    padding-top: max(0px, env(safe-area-inset-top, 0px));
+    box-sizing: border-box;
+  }
+  main[data-chrome-mode='tablet-land'] .top {
+    min-height: 4.75rem;
+    padding-bottom: 10px;
+  }
+  main[data-chrome-mode='tablet-land'] .toolbar {
+    margin-top: 14px;
+  }
+  main[data-chrome-mode='tablet-land'] .top h1 {
+    font-size: 1.62rem;
+    line-height: 1.22;
+  }
+  main[data-chrome-mode='phone-portrait'] .top {
+    min-height: unset;
+    padding-bottom: 4px;
+  }
+  main[data-chrome-mode='phone-portrait'] .toolbar {
+    margin-top: 10px;
+  }
+  main[data-chrome-mode='phone-land'] .top {
+    min-height: 3.25rem;
+    padding-bottom: 6px;
+  }
+  main[data-chrome-mode='phone-land'] .toolbar {
+    margin-top: 10px;
   }
   @media (min-width: 900px) {
     .layout {
@@ -964,8 +1024,8 @@
   @media (max-width: 639px) {
     .layout {
       max-width: 100%;
-      padding: 12px max(12px, env(safe-area-inset-left))
-        calc(12px + 56px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));
+      padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px))
+        calc(12px + 56px + max(env(safe-area-inset-bottom, 0px), 12px)) max(12px, env(safe-area-inset-right, 0px));
     }
     .layout-grid[data-mobile-panel='outline'] .col-related-wrap,
     .layout-grid[data-mobile-panel='outline'] .col-side {
@@ -986,9 +1046,9 @@
       left: 0;
       right: 0;
       bottom: 0;
-      min-height: calc(48px + env(safe-area-inset-bottom));
-      padding: 4px max(8px, env(safe-area-inset-left)) max(4px, env(safe-area-inset-bottom))
-        max(8px, env(safe-area-inset-right));
+      min-height: calc(48px + max(env(safe-area-inset-bottom, 0px), 8px));
+      padding: 4px max(8px, env(safe-area-inset-left, 0px)) max(4px, max(env(safe-area-inset-bottom, 0px), 8px))
+        max(8px, env(safe-area-inset-right, 0px));
       gap: 6px;
       justify-content: stretch;
       align-items: stretch;

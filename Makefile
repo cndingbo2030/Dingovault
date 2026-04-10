@@ -1,11 +1,28 @@
 # Dingovault production builds (requires Wails CLI: https://wails.io)
+# Semantic release filenames align with .github/workflows/release.yml (substitute REF when tagging).
 .PHONY: build release release-server dev clean benchmark fmt lint-frontend dist dist-dmg deploy-saas
 
+REF ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-APP_VERSION ?= 1.2.0
+APP_VERSION ?= 1.4.1
 GO_LDFLAGS_X := -X github.com/cndingbo2030/dingovault/internal/version.String=$(APP_VERSION)
 DIST_ARCH ?= $(shell uname -m)
+
+# Local / CI semantic artifact names (REF should be the tag, e.g. v1.4.1)
+RELEASE_LINUX_DESKTOP := Dingovault-$(REF)-Linux-Desktop-amd64.tar.gz
+RELEASE_LINUX_SERVER := Dingovault-$(REF)-Linux-Server-amd64
+RELEASE_WIN_SERVER := Dingovault-$(REF)-Windows-Server-amd64.exe
+RELEASE_WIN_INSTALLER := Dingovault-$(REF)-Windows-64bit-Installer.exe
+RELEASE_MAC_INTEL := Dingovault-$(REF)-macOS-Intel-Processor.zip
+RELEASE_MAC_AS := Dingovault-$(REF)-macOS-Apple-Silicon-M1-M2-M3.zip
+RELEASE_MAC_SERVER_INTEL := Dingovault-$(REF)-macOS-Server-Intel-amd64
+RELEASE_MAC_SERVER_AS := Dingovault-$(REF)-macOS-Server-Apple-Silicon-arm64
+RELEASE_ANDROID_AAR := Dingovault-$(REF)-Android-Library-AAR.aar
+RELEASE_ANDROID_APK := Dingovault-$(REF)-Android-Mobile-Phone-Tablet.apk
+RELEASE_ANDROID_AAB := Dingovault-$(REF)-Android-Play-Bundle.aab
+
 DIST_BUNDLE = dingovault-$(VERSION)-darwin-$(DIST_ARCH)
+# Local ad-hoc server binary (CI uses Dingovault-$(REF)-*-Server-* names from release.yml).
 SERVER_BIN = dingovault-v$(APP_VERSION)-$(shell uname -s | tr '[:upper:]' '[:lower:]')-$(DIST_ARCH)
 
 build:
@@ -57,3 +74,18 @@ dist-dmg: dist
 deploy-saas:
 	docker build -t dingovault-saas:latest -f Dockerfile .
 	@echo "Built dingovault-saas:latest — run: docker run --rm -p 12030:12030 -v dingovault-data:/data dingovault-saas:latest"
+
+# Echo canonical release filenames (handy when cutting a release locally).
+.PHONY: release-names
+release-names:
+	@echo "$(RELEASE_LINUX_DESKTOP)"
+	@echo "$(RELEASE_LINUX_SERVER)"
+	@echo "$(RELEASE_WIN_SERVER)"
+	@echo "$(RELEASE_WIN_INSTALLER)"
+	@echo "$(RELEASE_MAC_INTEL)"
+	@echo "$(RELEASE_MAC_AS)"
+	@echo "$(RELEASE_MAC_SERVER_INTEL)"
+	@echo "$(RELEASE_MAC_SERVER_AS)"
+	@echo "$(RELEASE_ANDROID_AAR)"
+	@echo "$(RELEASE_ANDROID_APK)"
+	@echo "$(RELEASE_ANDROID_AAB)"

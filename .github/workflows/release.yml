@@ -1,4 +1,5 @@
-# Cross-platform release: SaaS CLI binaries + Wails desktop builds when you push a version tag (v*).
+# Cross-platform release: SaaS CLI binaries + Wails desktop + Android (gomobile) on version tags (v*).
+# Asset names follow a semantic pattern (see Makefile RELEASE_* variables for local parity).
 name: Release
 
 on:
@@ -30,12 +31,16 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
+            suffix: Linux-Server-amd64
           - goos: windows
             goarch: amd64
+            suffix: Windows-Server-amd64.exe
           - goos: darwin
             goarch: amd64
+            suffix: macOS-Server-Intel-amd64
           - goos: darwin
             goarch: arm64
+            suffix: macOS-Server-Apple-Silicon-arm64
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,14 +53,13 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
         run: |
-          out="dingovault-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
-          if [ "${{ matrix.goos }}" = "windows" ]; then out="$out.exe"; fi
+          out="Dingovault-${{ github.ref_name }}-${{ matrix.suffix }}"
           go build -trimpath -ldflags="${GO_LDFLAGS}" -o "$out" ./cmd/dingovault
-          chmod +x "$out" || true
+          chmod +x "$out" 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dingovault-${{ github.ref_name }}-*
+          path: Dingovault-${{ github.ref_name }}-${{ matrix.suffix }}
 
   wails-linux:
     needs: test
@@ -79,14 +83,15 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
       - name: Build desktop (Linux)
         run: |
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           wails build -platform linux/amd64 -o dingovault -ldflags "${GO_LDFLAGS}"
-      - name: Pack
-        run: tar -czvf dingovault-${{ github.ref_name }}-linux-amd64.tar.gz -C build/bin .
+      - name: Pack (semantic name)
+        run: |
+          tar -czvf "Dingovault-${{ github.ref_name }}-Linux-Desktop-amd64.tar.gz" -C build/bin .
       - uses: actions/upload-artifact@v4
         with:
           name: wails-linux-amd64
-          path: dingovault-${{ github.ref_name }}-linux-amd64.tar.gz
+          path: Dingovault-${{ github.ref_name }}-Linux-Desktop-amd64.tar.gz
 
   wails-macos:
     needs: test
@@ -95,7 +100,9 @@ jobs:
       matrix:
         include:
           - arch: amd64
+            zip_suffix: macOS-Intel-Processor
           - arch: arm64
+            zip_suffix: macOS-Apple-Silicon-M1-M2-M3
     env:
       GO_LDFLAGS: -s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${{ github.ref_name }}
     steps:
@@ -110,16 +117,16 @@ jobs:
       - run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
       - name: Build desktop (macOS)
         run: |
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           wails build -platform darwin/${{ matrix.arch }} -o Dingovault -ldflags "${GO_LDFLAGS}"
-      - name: Pack
+      - name: Pack (semantic name)
         run: |
           chmod +x build/bin/Dingovault.app/Contents/MacOS/Dingovault || true
-          cd build/bin && zip -r ../../dingovault-${{ github.ref_name }}-darwin-${{ matrix.arch }}.zip Dingovault.app
+          cd build/bin && zip -r "../../Dingovault-${{ github.ref_name }}-${{ matrix.zip_suffix }}.zip" Dingovault.app
       - uses: actions/upload-artifact@v4
         with:
           name: wails-macos-${{ matrix.arch }}
-          path: dingovault-${{ github.ref_name }}-darwin-${{ matrix.arch }}.zip
+          path: Dingovault-${{ github.ref_name }}-${{ matrix.zip_suffix }}.zip
 
   wails-windows:
     needs: test
@@ -149,17 +156,22 @@ jobs:
           set PATH=C:\msys64\mingw64\bin;%PATH%
           set CGO_ENABLED=1
           wails build -platform windows/amd64 -o dingovault.exe -ldflags "%GO_LDFLAGS%"
+      - name: Rename installer (semantic name)
+        shell: pwsh
+        run: |
+          Copy-Item -Force "build/bin/dingovault.exe" "Dingovault-${{ github.ref_name }}-Windows-64bit-Installer.exe"
       - uses: actions/upload-artifact@v4
         with:
           name: wails-windows-amd64
-          path: build/bin/dingovault.exe
+          path: Dingovault-${{ github.ref_name }}-Windows-64bit-Installer.exe
 
-  # gomobile .aar + minimal Gradle shell → universal APK + AAB (debug signing for CI artifacts).
+  # gomobile .aar + Gradle shell → universal APK + AAB. NDK paths are pinned for gomobile init/bind.
   android:
     needs: test
     runs-on: ubuntu-latest
     env:
       GO_LDFLAGS: -s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${{ github.ref_name }}
+      NDK_VER: "26.1.10909125"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -169,31 +181,57 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
       - uses: android-actions/setup-android@v3
-      - name: Android SDK components (NDK + platform)
+        with:
+          cmdline-tools-version: "12266719"
+          packages: "platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125"
+
+      - name: Resolve SDK / NDK paths (gomobile + Gradle)
         run: |
-          echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "ndk;26.1.10909125" "platforms;android-34" "build-tools;34.0.0"
-      - name: Install gomobile
+          set -euxo pipefail
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            echo "ANDROID_SDK_ROOT not set or missing"
+            exit 1
+          fi
+          # cmdline-tools: add first versioned bin dir (setup-android may not symlink "latest")
+          if [ -d "$SDK/cmdline-tools/latest/bin" ]; then
+            echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          else
+            for d in "$SDK/cmdline-tools"/*; do
+              if [ -x "$d/bin/sdkmanager" ]; then
+                echo "$d/bin" >> "$GITHUB_PATH"
+                break
+              fi
+            done
+          fi
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$SDK/ndk/${NDK_VER}" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$SDK/ndk/${NDK_VER}" >> "$GITHUB_ENV"
+          # gomobile / older tooling sometimes expect $ANDROID_HOME/ndk-bundle
+          ln -sfn "$SDK/ndk/${NDK_VER}" "$SDK/ndk-bundle"
+          test -d "$SDK/ndk/${NDK_VER}"
+
+      - name: Install gomobile (after NDK is on disk)
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
           go install golang.org/x/mobile/cmd/gobind@latest
           gomobile init
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+
       - name: gomobile bind (AAR)
         run: |
           gomobile bind -androidapi=24 \
             -ldflags="-s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${{ github.ref_name }}" \
-            -o dingovault-mobile.aar \
+            -o "Dingovault-${{ github.ref_name }}-Android-Library-AAR.aar" \
             -target=android \
             ./cmd/dingovault-android/mobile
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+
       - name: Gradle assembleRelease + bundleRelease
         run: |
-          cp dingovault-mobile.aar cmd/dingovault-android/android-shell/app/libs/
+          set -euxo pipefail
+          cp "Dingovault-${{ github.ref_name }}-Android-Library-AAR.aar" cmd/dingovault-android/android-shell/app/libs/dingovault-mobile.aar
           GRADLE_VER=8.7
           curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VER}-bin.zip" -o /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /tmp
@@ -202,15 +240,20 @@ jobs:
           gradle wrapper --gradle-version "${GRADLE_VER}"
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease --no-daemon
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          APK_SRC="app/build/outputs/apk/release/app-release.apk"
+          AAB_SRC="app/build/outputs/bundle/release/app-release.aab"
+          test -f "$APK_SRC"
+          test -f "$AAB_SRC"
+          cp "$APK_SRC" "${GITHUB_WORKSPACE}/Dingovault-${{ github.ref_name }}-Android-Mobile-Phone-Tablet.apk"
+          cp "$AAB_SRC" "${GITHUB_WORKSPACE}/Dingovault-${{ github.ref_name }}-Android-Play-Bundle.aab"
+
       - uses: actions/upload-artifact@v4
         with:
           name: android-mobile
           path: |
-            dingovault-mobile.aar
-            cmd/dingovault-android/android-shell/app/build/outputs/apk/release/app-release.apk
-            cmd/dingovault-android/android-shell/app/build/outputs/bundle/release/app-release.aab
+            Dingovault-${{ github.ref_name }}-Android-Library-AAR.aar
+            Dingovault-${{ github.ref_name }}-Android-Mobile-Phone-Tablet.apk
+            Dingovault-${{ github.ref_name }}-Android-Play-Bundle.aab
 
   publish:
     needs: [build-server, wails-linux, wails-macos, wails-windows, android]
@@ -242,20 +285,22 @@ jobs:
         with:
           path: artifacts
 
-      - name: Flatten for upload
+      - name: Flatten for upload (semantic filenames)
         run: |
+          set -euxo pipefail
+          VER="${{ github.ref_name }}"
           mkdir -p upload
-          cp artifacts/server-linux-amd64/dingovault-${{ github.ref_name }}-linux-amd64 upload/
-          cp artifacts/server-windows-amd64/dingovault-${{ github.ref_name }}-windows-amd64.exe upload/
-          cp artifacts/server-darwin-amd64/dingovault-${{ github.ref_name }}-darwin-amd64 upload/
-          cp artifacts/server-darwin-arm64/dingovault-${{ github.ref_name }}-darwin-arm64 upload/
-          cp artifacts/wails-linux-amd64/dingovault-${{ github.ref_name }}-linux-amd64.tar.gz upload/
-          cp artifacts/wails-macos-amd64/dingovault-${{ github.ref_name }}-darwin-amd64.zip upload/
-          cp artifacts/wails-macos-arm64/dingovault-${{ github.ref_name }}-darwin-arm64.zip upload/
-          cp artifacts/wails-windows-amd64/dingovault.exe upload/dingovault-${{ github.ref_name }}-windows-amd64-wails.exe
-          cp artifacts/android-mobile/dingovault-mobile.aar upload/dingovault-${{ github.ref_name }}-android.aar
-          cp artifacts/android-mobile/cmd/dingovault-android/android-shell/app/build/outputs/apk/release/app-release.apk upload/dingovault-${{ github.ref_name }}-universal.apk
-          cp artifacts/android-mobile/cmd/dingovault-android/android-shell/app/build/outputs/bundle/release/app-release.aab upload/dingovault-${{ github.ref_name }}.aab
+          cp "artifacts/server-linux-amd64/Dingovault-${VER}-Linux-Server-amd64" upload/
+          cp "artifacts/server-windows-amd64/Dingovault-${VER}-Windows-Server-amd64.exe" upload/
+          cp "artifacts/server-darwin-amd64/Dingovault-${VER}-macOS-Server-Intel-amd64" upload/
+          cp "artifacts/server-darwin-arm64/Dingovault-${VER}-macOS-Server-Apple-Silicon-arm64" upload/
+          cp "artifacts/wails-linux-amd64/Dingovault-${VER}-Linux-Desktop-amd64.tar.gz" upload/
+          cp "artifacts/wails-macos-amd64/Dingovault-${VER}-macOS-Intel-Processor.zip" upload/
+          cp "artifacts/wails-macos-arm64/Dingovault-${VER}-macOS-Apple-Silicon-M1-M2-M3.zip" upload/
+          cp "artifacts/wails-windows-amd64/Dingovault-${VER}-Windows-64bit-Installer.exe" upload/
+          cp "artifacts/android-mobile/Dingovault-${VER}-Android-Library-AAR.aar" upload/
+          cp "artifacts/android-mobile/Dingovault-${VER}-Android-Mobile-Phone-Tablet.apk" upload/
+          cp "artifacts/android-mobile/Dingovault-${VER}-Android-Play-Bundle.aab" upload/
 
       - name: Generate checksums
         run: |
