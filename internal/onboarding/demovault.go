@@ -87,3 +87,23 @@ func shouldReuse(dest, verPath string) bool {
 
 // DemoVaultRootName is the top-level directory name inside the embedded FS.
 const DemoVaultRootName = "demo-vault"
+
+// EnsureDemoVaultFromFSTo writes the embedded demo tree into dest when README.md is missing
+// (first run under a fixed vault path, e.g. Android scoped storage).
+func EnsureDemoVaultFromFSTo(dest string, fsys fs.FS, rootInFS string) error {
+	dest = filepath.Clean(dest)
+	readme := filepath.Join(dest, "README.md")
+	if st, err := os.Stat(readme); err == nil && !st.IsDir() {
+		return nil
+	}
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		return err
+	}
+	if err := fs.WalkDir(fsys, rootInFS, func(path string, d fs.DirEntry, walkErr error) error {
+		return demoWalkStep(fsys, rootInFS, dest, path, d, walkErr)
+	}); err != nil {
+		return err
+	}
+	verPath := filepath.Join(dest, ".bundle-version")
+	return os.WriteFile(verPath, []byte(DemoBundleVersion+"\n"), 0o644)
+}

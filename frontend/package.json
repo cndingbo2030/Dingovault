@@ -1,13 +1,14 @@
 {
   "name": "dingovault-frontend",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.4.3",
   "license": "AGPL-3.0",
   "type": "module",
   "author": "cndingbo2030 <cndingbo@outlook.com>",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:android": "DV_WEB_BASE=./ vite build",
     "preview": "vite preview",
     "lint": "svelte-check --threshold warning"
   },

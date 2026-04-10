@@ -5,9 +5,26 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 const appDirName = "dingovault"
+
+var (
+	dataDirMu       sync.RWMutex
+	dataDirOverride string // absolute app-private root (Android); config lives under <root>/config
+)
+
+// SetDataDir forces config (and related paths derived from Dir()) under baseDir, e.g. Context.getFilesDir().
+// Pass empty to use the default OS user config directory again.
+func SetDataDir(baseDir string) {
+	dataDirMu.Lock()
+	dataDirOverride = strings.TrimSpace(baseDir)
+	if dataDirOverride != "" {
+		dataDirOverride = filepath.Clean(dataDirOverride)
+	}
+	dataDirMu.Unlock()
+}
 
 // Config is persisted under the OS user config directory.
 type Config struct {
@@ -102,6 +119,12 @@ type Window struct {
 
 // Dir returns ~/.config/dingovault (or platform equivalent).
 func Dir() (string, error) {
+	dataDirMu.RLock()
+	override := dataDirOverride
+	dataDirMu.RUnlock()
+	if override != "" {
+		return filepath.Join(override, "config"), nil
+	}
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err

@@ -77,7 +77,10 @@
   let sideTab = 'backlinks'
   /** @type {'outline' | 'related' | 'side'} */
   let mobilePanel = 'outline'
-  /** @type {'default' | 'phone-portrait' | 'phone-land' | 'tablet-land'} */
+  let sideSheetOpen = false
+  /** @type {string[]} */
+  let navStack = []
+  /** @type {'default' | 'phone-portrait' | 'phone-land' | 'tablet-land' | 'small-tablet'} */
   let chromeMode = 'default'
 
   function syncChromeMode() {
@@ -85,9 +88,11 @@
     const w = window.innerWidth
     const h = window.innerHeight
     const land = w >= h
-    if (land && w >= 600) {
+    if (land && w >= 900) {
       chromeMode = 'tablet-land'
-    } else if (!land && w <= 639) {
+    } else if (w >= 600 && w < 900) {
+      chromeMode = 'small-tablet'
+    } else if (!land && w <= 599) {
       chromeMode = 'phone-portrait'
     } else if (land && w < 600) {
       chromeMode = 'phone-land'
@@ -95,6 +100,8 @@
       chromeMode = 'default'
     }
   }
+
+  $: if (chromeMode !== 'small-tablet') sideSheetOpen = false
   /** @type {string} */
   let appVersion = ''
   /** @type {{ nodes: { id: string, label: string }[], edges: { source: string, target: string }[] }} */
@@ -267,6 +274,32 @@
     }
   }
 
+  function goBackAndroid() {
+    if (paletteOpen) {
+      paletteOpen = false
+      return true
+    }
+    if (aboutOpen) {
+      aboutOpen = false
+      return true
+    }
+    if (graphOpen) {
+      graphOpen = false
+      return true
+    }
+    if (chromeMode === 'small-tablet' && sideSheetOpen) {
+      sideSheetOpen = false
+      return true
+    }
+    if (navStack.length > 1) {
+      const prev = navStack[navStack.length - 2]
+      navStack = navStack.slice(0, -1)
+      void loadPage(prev, { skipHistory: true })
+      return true
+    }
+    return false
+  }
+
   onMount(() => {
     document.documentElement.style.setProperty('--dv-font', "var(--dv-font-sans, 'Inter', system-ui, sans-serif)")
 
@@ -345,8 +378,36 @@
       if (ae && ae.tagName === 'TEXTAREA' && ae.closest('.outliner-panel')) {
         return
       }
-      await loadPage(pagePath)
+      await loadPage(pagePath, { skipHistory: true })
     })
+
+    if (typeof window !== 'undefined') {
+      const w = /** @type {any} */ (window)
+      w.__dingoConsumeAndroidBack = () => goBackAndroid()
+    }
+
+    /** @param {FocusEvent} e */
+    const onFocusIn = (e) => {
+      const t = e.target
+      if (t instanceof HTMLTextAreaElement && t.closest('.outliner-panel')) {
+        requestAnimationFrame(() => {
+          t.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        })
+      }
+    }
+    document.addEventListener('focusin', onFocusIn)
+
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    const onVV = () => {
+      if (!vv) return
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      document.documentElement.style.setProperty('--dv-keyboard-inset', `${inset}px`)
+    }
+    if (vv) {
+      onVV()
+      vv.addEventListener('resize', onVV)
+      vv.addEventListener('scroll', onVV)
+    }
 
     /** @param {KeyboardEvent} e */
     const onKey = (e) => {
@@ -360,17 +421,37 @@
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('orientationchange', syncChromeMode)
+      document.removeEventListener('focusin', onFocusIn)
+      if (vv) {
+        vv.removeEventListener('resize', onVV)
+        vv.removeEventListener('scroll', onVV)
+      }
+      if (typeof window !== 'undefined') {
+        const w = /** @type {any} */ (window)
+        if (w.__dingoConsumeAndroidBack) delete w.__dingoConsumeAndroidBack
+      }
       ro?.disconnect()
     }
   })
 
   /**
    * @param {string} rel
-   * @param {{ focusBlockId?: string, caretOffset?: number }} [opts]
+   * @param {{ focusBlockId?: string, caretOffset?: number, skipHistory?: boolean, replaceTop?: boolean }} [opts]
    */
   async function loadPage(rel, opts) {
     const focusId = opts?.focusBlockId
     const caret = opts?.caretOffset
+    const skipHist = opts?.skipHistory
+    const replaceTop = opts?.replaceTop
+    if (!skipHist) {
+      if (navStack.length === 0) {
+        navStack = [rel]
+      } else if (replaceTop) {
+        navStack = [...navStack.slice(0, -1), rel]
+      } else if (navStack[navStack.length - 1] !== rel) {
+        navStack = [...navStack, rel]
+      }
+    }
     err = ''
     pageLoading = true
     try {
@@ -559,7 +640,11 @@
   }
 </script>
 
-<main class="layout zen" data-chrome-mode={chromeMode}>
+<main
+  class="layout zen"
+  class:side-sheet-open={sideSheetOpen && chromeMode === 'small-tablet'}
+  data-chrome-mode={chromeMode}
+>
   <nav class="breadcrumbs" class:index-pulse={indexPulse} aria-label={T('app.breadcrumb')}>
     <span class="crumb vault">{vaultBasename(notesRoot)}</span>
     {#if breadcrumbSegments.length > 1}
@@ -583,8 +668,20 @@
   </header>
 
   <div class="toolbar">
+    {#if chromeMode === 'small-tablet'}
+      <button
+        type="button"
+        class="btn secondary hamburger-btn"
+        aria-expanded={sideSheetOpen}
+        on:click={() => (sideSheetOpen = !sideSheetOpen)}
+      >
+        ☰ {T('app.mobileNavSide')}
+      </button>
+    {/if}
     <input class="path-input" bind:value={pagePath} placeholder={T('app.pathPlaceholder')} />
-    <button type="button" class="btn" on:click={() => loadPage(pagePath)}>{T('app.open')}</button>
+    <button type="button" class="btn" on:click={() => loadPage(pagePath, { replaceTop: true })}
+      >{T('app.open')}</button
+    >
     <button type="button" class="btn secondary" on:click={openOrCreate}>{T('app.ensurePage')}</button>
     <button
       type="button"
@@ -643,7 +740,7 @@
           <div class="about-logo">D</div>
         </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.4.2'}</p>
+        <p class="about-ver">{appVersion || 'v1.4.3'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>
@@ -678,6 +775,15 @@
 
   {#if err}
     <p class="err">{err}</p>
+  {/if}
+
+  {#if chromeMode === 'small-tablet' && sideSheetOpen}
+    <div
+      class="side-sheet-backdrop"
+      role="presentation"
+      transition:fade={{ duration: 140 }}
+      on:click={() => (sideSheetOpen = false)}
+    ></div>
   {/if}
 
   <div class="layout-grid" data-mobile-panel={mobilePanel}>
@@ -1001,6 +1107,34 @@
   .layout-grid {
     display: block;
   }
+  main[data-chrome-mode='small-tablet'] .layout-grid .dv-sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 52vh;
+    z-index: 70;
+    transform: translateY(110%);
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    overflow: auto;
+    margin-top: 0;
+    border-radius: 14px 14px 0 0;
+  }
+  main[data-chrome-mode='small-tablet'].side-sheet-open .layout-grid .dv-sidebar {
+    transform: translateY(0);
+  }
+  .side-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    background: rgba(0, 0, 0, 0.42);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+  }
+  .hamburger-btn {
+    flex-shrink: 0;
+  }
+
   @media (min-width: 900px) {
     .layout-grid {
       display: grid;
@@ -1021,7 +1155,7 @@
   .mobile-tabbar {
     display: none;
   }
-  @media (max-width: 639px) {
+  @media (max-width: 599px) {
     .layout {
       max-width: 100%;
       padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px))
@@ -1167,9 +1301,11 @@
   .outliner-panel {
     margin-top: 20px;
     padding: 16px;
+    padding-bottom: calc(16px + var(--dv-keyboard-inset, 0px));
     background: color-mix(in srgb, var(--dv-fg) 4%, transparent);
     border-radius: 10px;
     border: 1px solid var(--dv-border);
+    scroll-margin-bottom: max(24px, var(--dv-keyboard-inset, 0px));
   }
   .outliner-panel h2 {
     margin: 0 0 12px;
@@ -1199,7 +1335,7 @@
     min-height: 40px;
     font-size: 0.8rem;
   }
-  @media (max-width: 639px) {
+  @media (max-width: 599px) {
     .btn.sm {
       min-height: 48px;
     }

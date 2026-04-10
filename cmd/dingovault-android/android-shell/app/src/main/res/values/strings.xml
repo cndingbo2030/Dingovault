@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Dingovault</string>
+    <string name="storage_dialog_title">Storage access</string>
+    <string name="storage_dialog_message">Your vault lives in private app storage (no permission required). Optional read access helps if you later import notes from shared folders on older Android versions.</string>
+    <string name="storage_dialog_accept">Allow optional access</string>
+    <string name="storage_dialog_skip">Continue without</string>
+    <string name="init_failed_title">Could not start Dingovault</string>
 </resources>

@@ -25,6 +25,10 @@ type App struct {
 	graph     *graph.Service
 	notesRoot string
 
+	// EventEmitter is optional (Android WebView). When set, code that would use Wails runtime events
+	// should prefer this path so the native shell can forward to JavaScript.
+	EventEmitter func(name string, payload map[string]any)
+
 	lanMu   sync.Mutex
 	stopLAN func()
 }

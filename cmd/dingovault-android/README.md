@@ -4,8 +4,8 @@ This tree holds the **Go mobile library** consumed by a minimal Android shell.
 
 ## Layout
 
-- `mobile/` — `gomobile bind` target (`.aar`). Exposes `Version()` and `VaultPath(externalFilesDir)` for scoped storage under `…/Android/data/<app>/files/Dingovault/`.
-- `android-shell/` — Gradle app that links the AAR and produces **APK** / **AAB** (CI builds release artifacts with the debug keystore for attach-to-release; sign properly for Play).
+- `mobile/` — `gomobile bind` target (`.aar`). Initializes SQLite + indexer, exposes `Init` / `Shutdown` / `Invoke` (Wails-compatible JSON bridge), `SetEventSink`, plus `Version()` and `VaultPath(externalFilesDir)` for scoped storage under `…/Android/data/<app>/files/Dingovault/`. Embeds a copy of `demo-vault/` for first-run content.
+- `android-shell/` — Kotlin **WebView** shell that loads `assets/dist` (Svelte `frontend`), injects `android-shim.js` for `window.go.bridge.App`, and produces **APK** / **AAB** (CI builds release artifacts with the debug keystore for attach-to-release; sign properly for Play).
 
 ## Local build (AAR)
 
@@ -18,7 +18,18 @@ gomobile init
 gomobile bind -androidapi=24 -o dingovault-mobile.aar -target=android ./mobile
 ```
 
-Copy `dingovault-mobile.aar` to `android-shell/app/libs/` before `./gradlew assembleRelease`.
+Copy `dingovault-mobile.aar` to `android-shell/app/libs/`, then from the **repo root**:
+
+```bash
+cd frontend && npm ci && npm run build:android
+```
+
+Gradle **preBuild** copies `frontend/dist` into `app/src/main/assets/dist` and patches `index.html` to load `../android-shim.js`. Then:
+
+```bash
+cd cmd/dingovault-android/android-shell
+./gradlew assembleRelease
+```
 
 ## CI
 

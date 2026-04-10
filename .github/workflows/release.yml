@@ -298,6 +298,9 @@ jobs:
           go install golang.org/x/mobile/cmd/gobind@latest
           gomobile init
 
+      - name: Frontend dist for WebView (relative asset paths)
+        run: npm ci --prefix frontend && npm run build:android --prefix frontend
+
       - name: gomobile bind (AAR)
         run: |
           gomobile bind -androidapi=24 \

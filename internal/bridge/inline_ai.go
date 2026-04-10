@@ -41,6 +41,10 @@ func (a *App) runAIInlineStream(opID, blockID, instruction string) {
 		ctx = a.ctx
 	}
 	emit := func(name string, payload map[string]any) {
+		if a.EventEmitter != nil {
+			a.EventEmitter(name, payload)
+			return
+		}
 		if a.ctx == nil {
 			return
 		}
