@@ -107,7 +107,8 @@
     gap: 8px;
     width: 100%;
     text-align: left;
-    padding: 6px 8px;
+    min-height: 48px;
+    padding: 10px 10px;
     margin: 0;
     border: none;
     border-radius: 6px;
@@ -115,6 +116,7 @@
     color: #b4c8ff;
     cursor: pointer;
     font: inherit;
+    touch-action: manipulation;
   }
   .hit:hover {
     background: rgba(120, 160, 255, 0.16);

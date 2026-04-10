@@ -2,13 +2,13 @@
 
 English | [中文](README_zh.md)
 
-[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault?v=1.3.2)](https://github.com/cndingbo2030/dingovault/releases)
-[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg?v=1.3.2)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault?v=1.3.2)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
+[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault?v=1.4.0)](https://github.com/cndingbo2030/dingovault/releases)
+[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg?v=1.4.0)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault?v=1.4.0)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
 [![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
-[![License](https://img.shields.io/github/license/cndingbo2030/dingovault?v=1.3.2)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
-[![Stars](https://img.shields.io/github/stars/cndingbo2030/dingovault?v=1.3.2)](https://github.com/cndingbo2030/dingovault/stargazers)
-[![Forks](https://img.shields.io/github/forks/cndingbo2030/dingovault?v=1.3.2)](https://github.com/cndingbo2030/dingovault/forks)
+[![License](https://img.shields.io/github/license/cndingbo2030/dingovault?v=1.4.0)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/cndingbo2030/dingovault?v=1.4.0)](https://github.com/cndingbo2030/dingovault/stargazers)
+[![Forks](https://img.shields.io/github/forks/cndingbo2030/dingovault?v=1.4.0)](https://github.com/cndingbo2030/dingovault/forks)
 <!-- badge-refresh-2026-04-09 -->
 
 **基于 Go 的高性能、本地优先大纲笔记系统，支持 SaaS 同步。**
@@ -22,6 +22,14 @@ go install github.com/cndingbo2030/dingovault/cmd/dingovault@latest
 Go 模块路径：**`github.com/cndingbo2030/dingovault`**
 
 Dingovault 以 Markdown 块（block）为核心，提供 FTS5 全文搜索、双链、YAML Frontmatter 与桌面端体验。通过统一的 `storage.Provider` 抽象，同一套业务逻辑可运行在本地 SQLite 或远程 SaaS API。
+
+## v1.4.0 — Android gomobile 与响应式界面
+
+详见 **[CHANGELOG.md](CHANGELOG.md)**。
+
+- **gomobile `.aar`**（`cmd/dingovault-android/mobile`）与极简 **Gradle 壳**，在版本标签的 CI 中产出 **APK / AAB**。
+- **分区存储路径**辅助函数，便于将仓库根目录放在应用专属外部目录下。
+- **响应式 UI：**`dvh`、**48px** 触控、手机 **底部导航**、宽屏 **三栏**（大纲 / 语义相关 / 侧栏）。
 
 ## v1.3.2 — WebDAV、S3 兼容同步与局域网发现
 

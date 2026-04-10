@@ -2,6 +2,22 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
+## v1.4.0 — Android build pipeline & mobile-ready UI (2026-04-10)
+
+### Android (gomobile)
+
+Tagged releases now attach a **`.aar`** built with **gomobile bind** from `cmd/dingovault-android/mobile`, plus a minimal shell app that produces a **universal APK** and **AAB** (CI uses the debug keystore for attachable artifacts — sign release builds for Play yourself). The library exposes version and a **scoped-storage vault path** helper for hosts that pass `Context.getExternalFilesDir(null)`.
+
+### Desktop / webview UI
+
+The Svelte shell uses **dynamic viewport units** where it matters for mobile height, **48px** minimum targets on primary controls, a **bottom tab bar** on narrow screens to switch between outline, semantic related, and backlinks/AI, and an automatic **three-column** layout on wide viewports.
+
+### Tooling
+
+- `golangci-lint` now includes **ineffassign** alongside govet, staticcheck, and revive.
+
+---
+
 ## v1.3.2 — S3-compatible sync & richer LAN pairing (2026-04-10)
 
 ### Object storage sync

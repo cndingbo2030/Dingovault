@@ -75,6 +75,8 @@
   let aboutOpen = false
   /** @type {'backlinks' | 'ai'} */
   let sideTab = 'backlinks'
+  /** @type {'outline' | 'related' | 'side'} */
+  let mobilePanel = 'outline'
   /** @type {string} */
   let appVersion = ''
   /** @type {{ nodes: { id: string, label: string }[], edges: { source: string, target: string }[] }} */
@@ -613,7 +615,7 @@
           <div class="about-logo">D</div>
         </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.3.2'}</p>
+        <p class="about-ver">{appVersion || 'v1.4.0'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>
@@ -650,7 +652,8 @@
     <p class="err">{err}</p>
   {/if}
 
-  <section class="outliner-panel">
+  <div class="layout-grid" data-mobile-panel={mobilePanel}>
+  <section class="col-main outliner-panel">
     <h2>{T('app.outline')}</h2>
     {#if pageLoading}
       <div class="skeleton-stack" aria-busy="true">
@@ -696,9 +699,11 @@
     {/if}
     </section>
 
-  <SemanticRelated {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
+  <div class="col-related-wrap">
+    <SemanticRelated {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
+  </div>
 
-  <aside class="dv-sidebar" aria-label={T('sidebar.aria')}>
+  <aside class="dv-sidebar col-side" aria-label={T('sidebar.aria')}>
     <div class="side-tabs" role="tablist" aria-label={T('sidebar.tablist')}>
       <button
         type="button"
@@ -735,6 +740,7 @@
       {/if}
     </div>
   </aside>
+  </div>
 
   {#if $sidebarEntries.length}
     <aside
@@ -756,6 +762,33 @@
         {T('app.hint')}
   </p>
 </main>
+
+<nav class="mobile-tabbar" aria-label={T('app.mobileNavAria')}>
+  <button
+    type="button"
+    class="mobile-tab-btn"
+    class:active={mobilePanel === 'outline'}
+    on:click={() => (mobilePanel = 'outline')}
+  >
+    {T('app.mobileNavOutline')}
+  </button>
+  <button
+    type="button"
+    class="mobile-tab-btn"
+    class:active={mobilePanel === 'related'}
+    on:click={() => (mobilePanel = 'related')}
+  >
+    {T('app.mobileNavRelated')}
+  </button>
+  <button
+    type="button"
+    class="mobile-tab-btn"
+    class:active={mobilePanel === 'side'}
+    on:click={() => (mobilePanel = 'side')}
+  >
+    {T('app.mobileNavSide')}
+  </button>
+</nav>
 
 <CommandPalette
   open={paletteOpen}
@@ -794,6 +827,7 @@
   :global(body) {
     margin: 0;
     min-height: 100vh;
+    min-height: 100dvh;
     background: transparent;
     color: var(--dv-fg);
     font-family: var(--dv-font, var(--dv-font-sans, 'Inter', system-ui, sans-serif));
@@ -899,11 +933,85 @@
     padding: 20px max(16px, env(safe-area-inset-left)) 56px max(16px, env(safe-area-inset-right));
     box-sizing: border-box;
   }
-  @media (max-width: 640px) {
+  @media (min-width: 900px) {
+    .layout {
+      max-width: min(100%, 1680px);
+    }
+  }
+  .layout-grid {
+    display: block;
+  }
+  @media (min-width: 900px) {
+    .layout-grid {
+      display: grid;
+      grid-template-columns: minmax(200px, 24%) minmax(300px, 1fr) minmax(240px, 26%);
+      gap: 16px;
+      align-items: start;
+    }
+    .layout-grid .col-related-wrap :global(.semantic-related) {
+      margin-top: 0;
+    }
+    .layout-grid .dv-sidebar {
+      margin-top: 0;
+    }
+    .layout-grid .col-main.outliner-panel {
+      margin-top: 0;
+    }
+  }
+  .mobile-tabbar {
+    display: none;
+  }
+  @media (max-width: 639px) {
     .layout {
       max-width: 100%;
-      padding: 12px max(12px, env(safe-area-inset-left)) max(72px, env(safe-area-inset-bottom))
-        max(12px, env(safe-area-inset-right));
+      padding: 12px max(12px, env(safe-area-inset-left))
+        calc(12px + 56px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));
+    }
+    .layout-grid[data-mobile-panel='outline'] .col-related-wrap,
+    .layout-grid[data-mobile-panel='outline'] .col-side {
+      display: none;
+    }
+    .layout-grid[data-mobile-panel='related'] .col-main,
+    .layout-grid[data-mobile-panel='related'] .col-side {
+      display: none;
+    }
+    .layout-grid[data-mobile-panel='side'] .col-main,
+    .layout-grid[data-mobile-panel='side'] .col-related-wrap {
+      display: none;
+    }
+    .mobile-tabbar {
+      display: flex;
+      position: fixed;
+      z-index: 60;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      min-height: calc(48px + env(safe-area-inset-bottom));
+      padding: 4px max(8px, env(safe-area-inset-left)) max(4px, env(safe-area-inset-bottom))
+        max(8px, env(safe-area-inset-right));
+      gap: 6px;
+      justify-content: stretch;
+      align-items: stretch;
+      border-top: 1px solid var(--dv-border);
+      background: color-mix(in srgb, var(--dv-panel) 96%, transparent);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+    .mobile-tab-btn {
+      flex: 1;
+      min-height: 48px;
+      padding: 8px 6px;
+      border-radius: 10px;
+      border: 1px solid var(--dv-border);
+      background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+      color: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      touch-action: manipulation;
+    }
+    .mobile-tab-btn.active {
+      border-color: rgba(120, 160, 255, 0.45);
+      background: rgba(80, 120, 255, 0.14);
     }
     .top h1 {
       font-size: 1.35rem;
@@ -916,9 +1024,10 @@
       min-width: 0;
       width: 100%;
       font-size: 16px;
+      min-height: 48px;
     }
     .btn {
-      min-height: 44px;
+      min-height: 48px;
       font-size: 1rem;
       touch-action: manipulation;
     }
@@ -981,10 +1090,12 @@
   }
   .btn {
     padding: 8px 14px;
+    min-height: 48px;
     border-radius: 8px;
     border: 1px solid var(--dv-border);
     background: rgba(80, 120, 255, 0.25);
     color: var(--dv-fg);
+    touch-action: manipulation;
   }
   .btn.secondary {
     background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
@@ -1024,8 +1135,14 @@
     margin-right: 4px;
   }
   .btn.sm {
-    padding: 4px 10px;
+    padding: 6px 12px;
+    min-height: 40px;
     font-size: 0.8rem;
+  }
+  @media (max-width: 639px) {
+    .btn.sm {
+      min-height: 48px;
+    }
   }
   .about-backdrop {
     position: fixed;
@@ -1142,6 +1259,7 @@
   }
   .side-tab {
     flex: 1;
+    min-height: 48px;
     padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid var(--dv-border);
@@ -1151,6 +1269,7 @@
     font-weight: 500;
     cursor: pointer;
     opacity: 0.65;
+    touch-action: manipulation;
   }
   .side-tab.active {
     opacity: 1;

@@ -1,7 +1,7 @@
 {
   "name": "dingovault-frontend",
   "private": true,
-  "version": "1.3.2",
+  "version": "1.4.0",
   "type": "module",
   "author": "cndingbo2030 <cndingbo@outlook.com>",
   "scripts": {

@@ -34,7 +34,11 @@
     "createPage": "Create page \"{path}\"?",
     "langLabel": "Language",
     "langEn": "English",
-    "langZh": "中文"
+    "langZh": "中文",
+    "mobileNavAria": "Mobile section",
+    "mobileNavOutline": "Outline",
+    "mobileNavRelated": "Related",
+    "mobileNavSide": "Links & AI"
   },
   "palette": {
     "aria": "Command palette",

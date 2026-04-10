@@ -34,7 +34,11 @@
     "createPage": "创建页面「{path}」？",
     "langLabel": "语言",
     "langEn": "English",
-    "langZh": "中文"
+    "langZh": "中文",
+    "mobileNavAria": "移动端分区",
+    "mobileNavOutline": "大纲",
+    "mobileNavRelated": "相关",
+    "mobileNavSide": "链接与 AI"
   },
   "palette": {
     "aria": "命令面板",
