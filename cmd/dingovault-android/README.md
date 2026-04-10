@@ -22,4 +22,4 @@ Copy `dingovault-mobile.aar` to `android-shell/app/libs/` before `./gradlew asse
 
 ## CI
 
-Release tags trigger `.github/workflows/release.yml`, which runs `gomobile bind` and Gradle **assembleRelease** / **bundleRelease**. The workflow pins **cmdline-tools**, exports **ANDROID_HOME** / **ANDROID_NDK_HOME** / **NDK_HOME**, symlinks **`ndk-bundle`** for gomobile, and uses semantic artifact names such as **`Dingovault-v1.4.1-Android-Mobile-Phone-Tablet.apk`** (see repo **`Makefile`** `RELEASE_*` / `make release-names`).
+Release tags trigger `.github/workflows/release.yml`, which runs `gomobile bind` and Gradle **assembleRelease** / **bundleRelease**. The workflow pins **cmdline-tools**, exports **ANDROID_HOME** / **ANDROID_NDK_HOME** / **NDK_HOME**, symlinks **`ndk-bundle`** for gomobile, and uses semantic artifact names such as **`Dingovault-v1.4.x-Android-Mobile-Phone-Tablet.apk`** (see repo **`Makefile`** `RELEASE_*` / `make release-names`).

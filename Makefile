@@ -4,7 +4,7 @@
 
 REF ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-APP_VERSION ?= 1.4.1
+APP_VERSION ?= 1.4.2
 GO_LDFLAGS_X := -X github.com/cndingbo2030/dingovault/internal/version.String=$(APP_VERSION)
 DIST_ARCH ?= $(shell uname -m)
 

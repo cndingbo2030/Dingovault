@@ -2,13 +2,11 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
-## Repository — AGPL-3.0, GHCR, GitHub Packages npm (2026-04-10)
+## v1.4.2 — AGPL-3.0, GHCR, GitHub Packages npm (2026-04-10)
 
-- **License:** project is now **AGPL-3.0** (see root `LICENSE`).
+- **License:** project is **AGPL-3.0** (root `LICENSE`).
 - **Container:** tagged releases build and push **`ghcr.io/cndingbo2030/dingovault:<tag>`** and **`:latest`** (SaaS server `Dockerfile`).
 - **npm stub:** **`@cndingbo2030/dingovault-sdk`** published from **`sdk/`** to **GitHub Packages** on each **`v*`** tag (placeholder for future plugin APIs).
-
----
 
 ## v1.4.1 — Release workflow healing & semantic download names (2026-04-10)
 
