@@ -329,6 +329,46 @@ func (r *RemoteStore) IndexStats(ctx context.Context) (IndexStats, error) {
 	return st, nil
 }
 
+// UpsertBlockEmbedding is a no-op for the remote provider (vectors stay local-only for now).
+func (r *RemoteStore) UpsertBlockEmbedding(ctx context.Context, userID, blockID, model string, vec []float32) error {
+	_ = ctx
+	_ = userID
+	_ = blockID
+	_ = model
+	_ = vec
+	return nil
+}
+
+// SearchSemantic is unsupported for the remote provider.
+func (r *RemoteStore) SearchSemantic(ctx context.Context, queryVector []float32, embeddingModel string, topK int) ([]SemanticSearchHit, error) {
+	_ = r
+	_ = ctx
+	_ = queryVector
+	_ = embeddingModel
+	_ = topK
+	return nil, nil
+}
+
+// SemanticPageEdges is unsupported for the remote provider.
+func (r *RemoteStore) SemanticPageEdges(ctx context.Context, embeddingModel string, minCosine float32, maxEdges int) ([]WikiGraphSemanticEdge, error) {
+	_ = r
+	_ = ctx
+	_ = embeddingModel
+	_ = minCosine
+	_ = maxEdges
+	return nil, nil
+}
+
+// SuggestTagsByEmbedding is unsupported for the remote provider.
+func (r *RemoteStore) SuggestTagsByEmbedding(ctx context.Context, query []float32, embeddingModel string, topN int) ([]string, error) {
+	_ = r
+	_ = ctx
+	_ = query
+	_ = embeddingModel
+	_ = topN
+	return nil, nil
+}
+
 func (r *RemoteStore) DeleteIndexedSource(ctx context.Context, absSourcePath string) error {
 	u := r.baseURL + "/api/v1/pages?sourcePath=" + url.QueryEscape(absSourcePath)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u, nil)

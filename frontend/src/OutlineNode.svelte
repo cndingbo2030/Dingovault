@@ -1,4 +1,15 @@
 <script>
+  import { onDestroy } from 'svelte'
+  import { StartAIInlineStream, SuggestTagsForBlock } from '../wailsjs/go/bridge/App.js'
+  import { messages, tr } from './lib/i18n/index.js'
+  import { pushToast } from './toastStore.js'
+
+  $: L = $messages
+  /** @param {string} path @param {Record<string, string | number> | undefined} [vars] */
+  function T(path, vars) {
+    return tr(L, path, vars)
+  }
+
   /** @type {{ id: string, content: string, children?: any[], metadata?: any }} */
   export let node
   /** @type {number} */
@@ -45,6 +56,8 @@
   let slashFilter = ''
 
   const slashCommands = [
+    { op: 'ai', label: 'AI edit', match: 'ai' },
+    { op: 'ai', label: 'Quick AI //', match: '/' },
     { op: 'todo', label: 'TODO', match: 'todo' },
     { op: 'today', label: 'Today', match: 'today' },
     { op: 'h1', label: 'Heading 1', match: 'h1' },
@@ -53,11 +66,144 @@
     { op: 'code', label: 'Code block', match: 'code' }
   ]
 
+  let aiPanelOpen = false
+  let aiInstruction = ''
+  let aiStreaming = false
+  /** @type {string} */
+  let aiOpID = ''
+  let aiBackup = ''
+  /** @type {string[]} */
+  let tagSuggestions = []
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let tagSuggestTimer
+  /** @type {((e: Event) => void) | undefined} */
+  let winChunkHandler
+  /** @type {((e: Event) => void) | undefined} */
+  let winErrHandler
+  /** @type {((e: Event) => void) | undefined} */
+  let winDoneHandler
+
   $: if (node.id !== lastNodeId) {
     lastNodeId = node.id
     local = node.content
     slashOpen = false
+    aiPanelOpen = false
+    aiStreaming = false
+    tagSuggestions = []
+    unwireAIWin()
   }
+
+  function newAIopID() {
+    return typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `ai-${node.id}-${Date.now()}`
+  }
+
+  /** @param {unknown} err */
+  function aiInlineToastMessage(err) {
+    const s = String(err || '').toLowerCase()
+    if (
+      /connection refused|econnrefused|network|broken pipe|eof|connection reset|reset by peer|timeout|dial tcp|no such host|failed to fetch/.test(
+        s
+      )
+    ) {
+      return T('outline.aiConnectionLost')
+    }
+    return String(err || 'AI error')
+  }
+
+  function unwireAIWin() {
+    if (winChunkHandler) window.removeEventListener('dv-ai-chunk', winChunkHandler)
+    if (winErrHandler) window.removeEventListener('dv-ai-err', winErrHandler)
+    if (winDoneHandler) window.removeEventListener('dv-ai-done', winDoneHandler)
+    winChunkHandler = undefined
+    winErrHandler = undefined
+    winDoneHandler = undefined
+  }
+
+  function wireAIWin() {
+    unwireAIWin()
+    winChunkHandler = (e) => {
+      const d = /** @type {CustomEvent} */ (e).detail
+      if (!d || d.opID !== aiOpID) return
+      const c = d.chunk != null ? String(d.chunk) : ''
+      local = (local || '') + c
+      queueSave()
+    }
+    winErrHandler = (e) => {
+      const d = /** @type {CustomEvent} */ (e).detail
+      if (!d || d.opID !== aiOpID) return
+      pushToast(aiInlineToastMessage(d.message), 'error')
+      local = aiBackup
+      aiStreaming = false
+      aiPanelOpen = false
+      unwireAIWin()
+    }
+    winDoneHandler = (e) => {
+      const d = /** @type {CustomEvent} */ (e).detail
+      if (!d || d.opID !== aiOpID) return
+      aiStreaming = false
+      aiPanelOpen = false
+      unwireAIWin()
+      void onFlushSave(node.id, local)
+    }
+    window.addEventListener('dv-ai-chunk', winChunkHandler)
+    window.addEventListener('dv-ai-err', winErrHandler)
+    window.addEventListener('dv-ai-done', winDoneHandler)
+  }
+
+  async function submitAIInline() {
+    const inst = aiInstruction.trim()
+    if (!inst || aiStreaming) return
+    aiBackup = local
+    local = ''
+    aiStreaming = true
+    aiOpID = newAIopID()
+    wireAIWin()
+    try {
+      await StartAIInlineStream(aiOpID, node.id, inst)
+    } catch (e) {
+      pushToast(aiInlineToastMessage(e), 'error')
+      local = aiBackup
+      aiStreaming = false
+      unwireAIWin()
+    }
+  }
+
+  function cancelAIPanel() {
+    if (aiStreaming) return
+    aiPanelOpen = false
+    aiInstruction = ''
+  }
+
+  /** @param {string} tag */
+  function appendSuggestedTag(tag) {
+    const t = String(tag || '').trim().toLowerCase()
+    if (!t) return
+    const token = '#' + t
+    if (local.includes(token)) return
+    const pad = local.length && !/\s$/.test(local) ? ' ' : ''
+    local = (local + pad + token).trimEnd()
+    void onFlushSave(node.id, local)
+  }
+
+  async function loadTagSuggestions() {
+    if (!local.trim()) {
+      tagSuggestions = []
+      return
+    }
+    try {
+      const tags = await SuggestTagsForBlock(node.id)
+      tagSuggestions = Array.isArray(tags) ? tags : []
+    } catch {
+      tagSuggestions = []
+    }
+  }
+
+  onDestroy(() => {
+    unwireAIWin()
+    if (tagSuggestTimer) clearTimeout(tagSuggestTimer)
+  })
 
   function queueSave() {
     if (saveTimer) clearTimeout(saveTimer)
@@ -111,11 +257,20 @@
     if (!taEl) return
     const v = taEl.value
     const pos = taEl.selectionStart
+    let endRemove = pos
+    if (slashFilter === '/' && v.slice(slashStart, slashStart + 2) === '//') {
+      endRemove = slashStart + 2
+    }
     const before = v.slice(0, slashStart)
-    const after = v.slice(pos)
+    const after = v.slice(endRemove)
     local = before + after
     slashOpen = false
     await flush()
+    if (op === 'ai') {
+      aiInstruction = ''
+      aiPanelOpen = true
+      return
+    }
     await onSlash(node.id, op)
   }
 
@@ -224,7 +379,7 @@
 
 <div
   class="row"
-  class:hasSlash={slashOpen}
+  class:hasSlash={slashOpen || aiPanelOpen}
   class:dragOver
   style="--depth: {depth}; padding-left: {4 + depth * 14}px; border-left-width: {depth > 0 ? 1 : 0}px"
   role="group"
@@ -276,19 +431,31 @@
     <textarea
       bind:this={taEl}
       class="ta"
+      class:ai-generating={aiStreaming}
       rows="2"
       data-block-id={node.id}
       bind:value={local}
-      on:input={onInput}
+      on:input={(e) => {
+        tagSuggestions = []
+        onInput(e)
+      }}
       on:blur={() => {
         flush()
         closeSlash()
+        if (tagSuggestTimer) clearTimeout(tagSuggestTimer)
+        tagSuggestTimer = window.setTimeout(() => void loadTagSuggestions(), 650)
+      }}
+      on:focus={() => {
+        if (tagSuggestTimer) {
+          clearTimeout(tagSuggestTimer)
+          tagSuggestTimer = undefined
+        }
       }}
       on:keydown={onKeydown}
     ></textarea>
     {#if slashOpen && filteredSlash.length}
       <div class="slash-menu" role="listbox" aria-label="Slash commands">
-        {#each filteredSlash as cmd (cmd.op)}
+        {#each filteredSlash as cmd (cmd.match + cmd.label)}
           <button
             type="button"
             class="slash-item"
@@ -308,6 +475,39 @@
         {#each wikiLinks(local) as w (w.target + w.label)}
           <button type="button" class="wiki" on:click={() => onWikiNavigate(w.target)}>[[{w.label}]]</button>
         {/each}
+      </div>
+    {/if}
+    {#if tagSuggestions.length}
+      <div class="tag-suggest" aria-label={T('outline.tagSuggestAria')}>
+        <span class="tag-hint">{T('outline.tagHint')}</span>
+        {#each tagSuggestions as tg (tg)}
+          <button type="button" class="tag-chip" on:click={() => appendSuggestedTag(tg)}>#{tg}</button>
+        {/each}
+      </div>
+    {/if}
+    {#if aiPanelOpen}
+      <div class="ai-pop" role="dialog" aria-label={T('outline.aiTitle')}>
+        <p class="ai-title">{T('outline.aiTitle')}</p>
+        <textarea
+          class="ai-instruction"
+          rows="2"
+          bind:value={aiInstruction}
+          placeholder={T('outline.aiPlaceholder')}
+          disabled={aiStreaming}
+          on:keydown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              void submitAIInline()
+            }
+            if (e.key === 'Escape') cancelAIPanel()
+          }}
+        />
+        <div class="ai-actions">
+          <button type="button" class="ai-run" disabled={aiStreaming || !aiInstruction.trim()} on:click={() => submitAIInline()}>
+            {T('outline.aiRun')}
+          </button>
+          <button type="button" class="ai-cancel" disabled={aiStreaming} on:click={cancelAIPanel}>{T('outline.aiCancel')}</button>
+        </div>
       </div>
     {/if}
     </div>
@@ -511,5 +711,109 @@
   }
   .wiki:hover {
     background: rgba(80, 120, 255, 0.22);
+  }
+  .tag-suggest {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px dashed color-mix(in srgb, var(--dv-fg) 16%, transparent);
+    background: color-mix(in srgb, var(--dv-fg) 3%, transparent);
+  }
+  .tag-hint {
+    font-size: 0.72rem;
+    opacity: 0.5;
+    margin-right: 4px;
+  }
+  .tag-chip {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(160, 200, 140, 0.35);
+    background: rgba(100, 160, 90, 0.12);
+    color: #c8e6b8;
+    cursor: pointer;
+  }
+  .tag-chip:hover {
+    background: rgba(100, 160, 90, 0.22);
+  }
+  .ai-pop {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 6px;
+    z-index: 40;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(120, 160, 255, 0.35);
+    background: var(--dv-panel, rgba(28, 28, 34, 0.98));
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  }
+  .ai-title {
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    opacity: 0.75;
+  }
+  .ai-instruction {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    min-height: 48px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--dv-border, rgba(255, 255, 255, 0.12));
+    background: var(--dv-input, rgba(0, 0, 0, 0.2));
+    color: inherit;
+    font-family: inherit;
+    font-size: 0.88rem;
+    margin-bottom: 8px;
+  }
+  .ai-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .ai-run,
+  .ai-cancel {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--dv-border, rgba(255, 255, 255, 0.12));
+    font-size: 0.82rem;
+    cursor: pointer;
+    color: inherit;
+  }
+  .ai-run {
+    background: rgba(80, 120, 255, 0.28);
+  }
+  .ai-run:disabled,
+  .ai-cancel:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .ai-cancel {
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+  }
+  .ta.ai-generating {
+    background: linear-gradient(
+      100deg,
+      var(--dv-input, rgba(0, 0, 0, 0.2)) 0%,
+      rgba(120, 160, 255, 0.12) 45%,
+      var(--dv-input, rgba(0, 0, 0, 0.2)) 90%
+    );
+    background-size: 200% 100%;
+    animation: dv-ai-shimmer 1.2s ease-in-out infinite;
+  }
+  @keyframes dv-ai-shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
   }
 </style>

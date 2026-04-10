@@ -8,7 +8,9 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/cndingbo2030/dingovault/internal/ai"
 	"github.com/cndingbo2030/dingovault/internal/bus"
 	"github.com/cndingbo2030/dingovault/internal/domain"
 	"github.com/cndingbo2030/dingovault/internal/parser"
@@ -25,19 +27,22 @@ const (
 type Plugin struct {
 	store  storage.Provider
 	engine *parser.Engine
+	llm    ai.LLMProvider
 
 	mu     sync.Mutex
 	active map[string]bool
 }
 
 // Register subscribes the summarizer plugin to bus.TopicAfterBlockIndexed.
-func Register(b *bus.Bus, store storage.Provider, engine *parser.Engine) *Plugin {
+// llm may be nil (uses a lightweight offline summary).
+func Register(b *bus.Bus, store storage.Provider, engine *parser.Engine, llm ai.LLMProvider) *Plugin {
 	if b == nil || store == nil || engine == nil {
 		return nil
 	}
 	p := &Plugin{
 		store:  store,
 		engine: engine,
+		llm:    llm,
 		active: map[string]bool{},
 	}
 	b.Subscribe(bus.TopicAfterBlockIndexed, p.onAfterBlockIndexed)
@@ -106,7 +111,7 @@ func (p *Plugin) handleSource(ctx context.Context, sourcePath string) error {
 	if err != nil {
 		return fmt.Errorf("read source file: %w", err)
 	}
-	sum := mockSummarize(target.Content)
+	sum := p.summarizeBlock(ctx, target.Content)
 	updated, ok := appendSummaryChild(raw, target.Metadata.LineEnd, sum)
 	if !ok {
 		return nil
@@ -139,6 +144,33 @@ func hasSummaryChild(blocks []domain.Block, parentID string) bool {
 		}
 	}
 	return false
+}
+
+func (p *Plugin) summarizeBlock(ctx context.Context, content string) string {
+	if p.llm != nil {
+		cctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+		defer cancel()
+		sys := "You write one concise outline summary line for a bullet in a personal notes app. " +
+			"Output exactly one line starting with 'Summary:'. No markdown fences, no preamble. " +
+			"End the line with the HTML comment <!-- dingovault:summarizer --> (same line is fine)."
+		user := strings.ReplaceAll(strings.TrimSpace(content), triggerTag, "")
+		msgs := []ai.ChatMessage{
+			{Role: "system", Content: sys},
+			{Role: "user", Content: user},
+		}
+		out, err := p.llm.Complete(cctx, msgs)
+		if err == nil && strings.TrimSpace(out) != "" {
+			line := strings.TrimSpace(out)
+			if !strings.Contains(line, summaryMarker) {
+				line = strings.TrimSpace(line + " " + summaryMarker)
+			}
+			return line
+		}
+		if err != nil {
+			log.Printf("summarizer llm: %v", err)
+		}
+	}
+	return mockSummarize(content)
 }
 
 func mockSummarize(content string) string {

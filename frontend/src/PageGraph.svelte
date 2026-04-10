@@ -5,6 +5,12 @@
   /** @type {{ nodes: { id: string, label: string }[], edges: { source: string, target: string }[] }} */
   export let graph = { nodes: [], edges: [] }
 
+  /** @type {{ source: string, target: string, score?: number }[]} */
+  export let semanticEdges = []
+
+  /** When true, overlay semantic similarity links (faint, undirected). */
+  export let semanticOn = false
+
   const w = 560
   const h = 380
 
@@ -21,22 +27,40 @@
       sim = null
     }
     const nodes = graph.nodes || []
-    const edges = graph.edges || []
+    const wikiEdges = graph.edges || []
     simNodes = nodes.map((n) => ({
       id: n.id,
       label: n.label || n.id,
       x: w / 2 + (Math.random() - 0.5) * 80,
       y: h / 2 + (Math.random() - 0.5) * 80
     }))
-    simLinks = edges.map((e) => ({ source: e.source, target: e.target }))
+    const wikiLinks = wikiEdges.map((e) => ({
+      source: e.source,
+      target: e.target,
+      semantic: false,
+      score: 0
+    }))
+    const sem = semanticOn
+      ? (semanticEdges || []).map((e) => ({
+          source: e.source,
+          target: e.target,
+          semantic: true,
+          score: typeof e.score === 'number' ? e.score : 0.65
+        }))
+      : []
+    simLinks = [...wikiLinks, ...sem]
 
     sim = forceSimulation(simNodes)
       .force(
         'link',
         forceLink(simLinks)
-          .id((d) => d.id)
-          .distance(90)
-          .strength(0.35)
+          .id((/** @type {{ id: string }} */ d) => d.id)
+          .distance((/** @type {{ semantic?: boolean, score?: number }} */ l) =>
+            l.semantic ? 108 + (1 - (l.score || 0.5)) * 40 : 90
+          )
+          .strength((/** @type {{ semantic?: boolean, score?: number }} */ l) =>
+            l.semantic ? 0.05 + (l.score || 0.5) * 0.08 : 0.35
+          )
       )
       .force('charge', forceManyBody().strength(-220))
       .force('center', forceCenter(w / 2, h / 2))
@@ -48,11 +72,14 @@
     sim.alpha(0.9).restart()
   }
 
-  $: graph && restart()
+  $: graph, semanticEdges, semanticOn, restart()
 
   onDestroy(() => {
     if (sim) sim.stop()
   })
+
+  $: wikiCount = (graph.edges || []).length
+  $: semCount = semanticOn ? (semanticEdges || []).length : 0
 </script>
 
 <div class="graph-wrap" aria-label="Page link graph">
@@ -62,18 +89,21 @@
         <path d="M0,0 L8,4 L0,8 Z" fill="rgba(140,160,220,0.5)" />
       </marker>
     </defs>
-    {#each simLinks as l, li (`${li}-${typeof l.source === 'object' ? l.source.id : l.source}-${typeof l.target === 'object' ? l.target.id : l.target}`)}
+    {#each simLinks as l, li (`${li}-${typeof l.source === 'object' ? l.source.id : l.source}-${typeof l.target === 'object' ? l.target.id : l.target}-${l.semantic ? 's' : 'w'}`)}
       {@const x1 = l.source.x ?? 0}
       {@const y1 = l.source.y ?? 0}
       {@const x2 = l.target.x ?? 0}
       {@const y2 = l.target.y ?? 0}
+      {@const op = l.semantic ? 0.1 + 0.42 * (l.score || 0.5) : 0.35}
       <line
         class="edge"
+        class:semantic={l.semantic}
         x1={x1}
         y1={y1}
         x2={x2}
         y2={y2}
-        marker-end="url(#arrow)"
+        stroke-opacity={op}
+        marker-end={l.semantic ? 'none' : 'url(#arrow)'}
       />
     {/each}
     {#each simNodes as n (n.id)}
@@ -83,7 +113,10 @@
       </g>
     {/each}
   </svg>
-  <p class="caption">{simNodes.length} pages · {simLinks.length} links</p>
+  <p class="caption">
+    {simNodes.length} pages · {wikiCount} wiki links{#if semanticOn}
+      · {semCount} semantic{/if}
+  </p>
 </div>
 
 <style>
@@ -103,6 +136,11 @@
   .edge {
     stroke: rgba(120, 140, 200, 0.35);
     stroke-width: 1.2;
+  }
+  .edge.semantic {
+    stroke: rgba(180, 140, 220, 0.55);
+    stroke-width: 1;
+    stroke-dasharray: 4 5;
   }
   .node circle {
     fill: rgba(80, 110, 200, 0.22);

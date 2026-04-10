@@ -2,4 +2,4 @@
 package version
 
 // String is overridden with -ldflags "-X github.com/cndingbo2030/dingovault/internal/version.String=..." in release builds.
-var String = "1.2.0"
+var String = "1.3.0"

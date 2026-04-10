@@ -13,6 +13,9 @@ var catalog = map[string]map[string]string{
 		ErrReadPage:          "Could not read page file.",
 		ErrWriteExport:       "Could not write export file.",
 		ErrLocaleUnsupported: "Language must be en or zh-CN.",
+		ErrAIKeyRequired:     "OpenAI provider requires an API key.",
+		ErrAIEmptyMessage:       "Message is empty.",
+		ErrAIEmptyInstruction:   "Instruction is empty.",
 	},
 	"zh-CN": {
 		ErrStoreNotInit:      "存储未初始化。",
@@ -25,5 +28,8 @@ var catalog = map[string]map[string]string{
 		ErrReadPage:          "无法读取页面文件。",
 		ErrWriteExport:       "无法写入导出文件。",
 		ErrLocaleUnsupported: "语言只能是 en 或 zh-CN。",
+		ErrAIKeyRequired:     "使用 OpenAI 时需要填写 API 密钥。",
+		ErrAIEmptyMessage:       "消息为空。",
+		ErrAIEmptyInstruction: "指令为空。",
 	},
 }

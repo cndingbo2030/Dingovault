@@ -8,8 +8,7 @@ import (
 	"github.com/cndingbo2030/dingovault/internal/domain"
 )
 
-func TestEngine_WikilinksTagsAndBlocks(t *testing.T) {
-	const md = `# Title here
+const wikilinksTagsBlocksMD = `# Title here
 
 Intro paragraph with [[Target Page|shown]] and #vault #go-lang.
 
@@ -18,19 +17,33 @@ Intro paragraph with [[Target Page|shown]] and #vault #go-lang.
   - Nested child
 `
 
+func parseWikilinksTagsBlocksFixture(t *testing.T) ParseResult {
+	t.Helper()
 	e := NewEngine()
-	res, err := e.ParseSource([]byte(md), "/tmp/note.md")
+	res, err := e.ParseSource([]byte(wikilinksTagsBlocksMD), "/tmp/note.md")
 	if err != nil {
 		t.Fatal(err)
 	}
+	return res
+}
 
+func TestEngine_WikilinksTagsAndBlocks_Blocks(t *testing.T) {
+	res := parseWikilinksTagsBlocksFixture(t)
 	if len(res.Blocks) < 4 {
 		t.Fatalf("expected several blocks, got %d", len(res.Blocks))
 	}
 	assertBlockKinds(t, res.Blocks)
-	assertWikilinks(t, res)
-	assertTags(t, res)
 	assertNestedParentID(t, res.Blocks)
+}
+
+func TestEngine_WikilinksTagsAndBlocks_Wikilinks(t *testing.T) {
+	res := parseWikilinksTagsBlocksFixture(t)
+	assertWikilinks(t, res)
+}
+
+func TestEngine_WikilinksTagsAndBlocks_Tags(t *testing.T) {
+	res := parseWikilinksTagsBlocksFixture(t)
+	assertTags(t, res)
 }
 
 func TestEngine_ListItemsHaveDistinctIDs(t *testing.T) {

@@ -2,13 +2,13 @@
 
 [中文文档](README_zh.md) | English
 
-[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault?v=1.2.0)](https://github.com/cndingbo2030/dingovault/releases)
-[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg?v=1.2.0)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault?v=1.2.0)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
+[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault?v=1.3.0)](https://github.com/cndingbo2030/dingovault/releases)
+[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg?v=1.3.0)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault?v=1.3.0)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
 [![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
-[![License](https://img.shields.io/github/license/cndingbo2030/dingovault?v=1.2.0)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
-[![Stars](https://img.shields.io/github/stars/cndingbo2030/dingovault?v=1.2.0)](https://github.com/cndingbo2030/dingovault/stargazers)
-[![Forks](https://img.shields.io/github/forks/cndingbo2030/dingovault?v=1.2.0)](https://github.com/cndingbo2030/dingovault/forks)
+[![License](https://img.shields.io/github/license/cndingbo2030/dingovault?v=1.3.0)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/cndingbo2030/dingovault?v=1.3.0)](https://github.com/cndingbo2030/dingovault/stargazers)
+[![Forks](https://img.shields.io/github/forks/cndingbo2030/dingovault?v=1.3.0)](https://github.com/cndingbo2030/dingovault/forks)
 <!-- badge-refresh-2026-04-09 -->
 
 **High-performance, local-first outliner with SaaS sync, built in Go.**
@@ -22,6 +22,15 @@ go install github.com/cndingbo2030/dingovault/cmd/dingovault@latest
 Go module path: **`github.com/cndingbo2030/dingovault`**
 
 Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikilinks, YAML frontmatter, and a clean desktop shell. The same core runs **offline** against embedded **SQLite** or **online** against your **self-hosted or managed SaaS API**—switchable via a small `storage.Provider` abstraction.
+
+## v1.3.0 — AI writing & smart links
+
+**Full user-facing notes:** see [CHANGELOG.md](CHANGELOG.md).
+
+- **Real-time inline AI:** streaming text as the model writes, with graceful recovery if the AI server disconnects.
+- **Vault-aware chat:** answers combine the open page with semantically related blocks from your notes (optional embeddings; local-first).
+- **Semantic related & graph:** discover similar blocks and optional meaning-based links alongside wikilinks.
+- **Smarter tag suggestions** based on how each block reads.
 
 ## v1.2.0 Master Release
 

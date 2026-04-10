@@ -33,6 +33,18 @@ type Provider interface {
 	ReplaceIndexedSource(ctx context.Context, absSourcePath string, res parser.ParseResult, pageProps map[string]string, aliases []string) error
 	DeleteIndexedSource(ctx context.Context, absSourcePath string) error
 
+	// UpsertBlockEmbedding stores a dense vector for a block (local SQLite; remote no-op).
+	UpsertBlockEmbedding(ctx context.Context, userID, blockID, model string, vec []float32) error
+
+	// SearchSemantic returns top-K blocks by cosine similarity to queryVector (same embedding model + dim).
+	SearchSemantic(ctx context.Context, queryVector []float32, embeddingModel string, topK int) ([]SemanticSearchHit, error)
+
+	// SemanticPageEdges returns high-similarity page pairs for graph visualization (local only).
+	SemanticPageEdges(ctx context.Context, embeddingModel string, minCosine float32, maxEdges int) ([]WikiGraphSemanticEdge, error)
+
+	// SuggestTagsByEmbedding ranks existing #tags by similarity to a query embedding (local SQLite).
+	SuggestTagsByEmbedding(ctx context.Context, query []float32, embeddingModel string, topN int) ([]string, error)
+
 	// IndexStats returns global block/page/tenant counts (SaaS monitoring; all tenants).
 	IndexStats(ctx context.Context) (IndexStats, error)
 

@@ -10,12 +10,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cndingbo2030/dingovault/internal/ai"
 	"github.com/cndingbo2030/dingovault/internal/bridge"
 	"github.com/cndingbo2030/dingovault/internal/bus"
 	"github.com/cndingbo2030/dingovault/internal/config"
 	"github.com/cndingbo2030/dingovault/internal/graph"
 	"github.com/cndingbo2030/dingovault/internal/onboarding"
 	"github.com/cndingbo2030/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/plugins/embeddings"
 	"github.com/cndingbo2030/dingovault/internal/plugins/summarizer"
 	"github.com/cndingbo2030/dingovault/internal/scanner"
 	"github.com/cndingbo2030/dingovault/internal/storage"
@@ -37,7 +39,7 @@ func main() {
 	store := openDesktopStore(cfg)
 	defer closeProvider(store)
 
-	graphSvc := setupDesktopGraph(store)
+	graphSvc := setupDesktopGraph(store, cfg)
 	idx := buildDesktopIndexer(notesPath, graphSvc, cfg.CloudMode)
 	defer func() { _ = idx.Close() }()
 
@@ -126,12 +128,21 @@ func closeProvider(store storage.Provider) {
 	}
 }
 
-func setupDesktopGraph(store storage.Provider) *graph.Service {
+func setupDesktopGraph(store storage.Provider, cfg config.Config) *graph.Service {
 	engine := parser.NewEngine()
 	graphSvc := graph.NewService(store, engine)
 	eventBus := bus.New()
 	graphSvc.SetBus(eventBus)
-	_ = summarizer.Register(eventBus, store, engine)
+	aiProv, err := ai.NewProvider(cfg.AI)
+	if err != nil {
+		log.Printf("ai provider: %v (LLM features use offline fallback where possible)", err)
+	}
+	var llm ai.LLMProvider
+	if err == nil {
+		llm = aiProv
+	}
+	_ = summarizer.Register(eventBus, store, engine, llm)
+	_ = embeddings.Register(eventBus, store, llm)
 	return graphSvc
 }
 

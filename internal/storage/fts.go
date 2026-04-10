@@ -109,46 +109,59 @@ func (s *Store) SearchBlocksFTSWithAliases(ctx context.Context, query string, li
 	for _, h := range hits {
 		seen[h.SourcePath] = struct{}{}
 	}
+	pairs, err := loadPageAliasPairs(ctx, s)
+	if err != nil {
+		return hits, err
+	}
+	return s.appendAliasFTSHits(ctx, hits, seen, pairs, toks, limit), nil
+}
 
+type aliasPathPair struct {
+	alias string
+	path  string
+}
+
+func loadPageAliasPairs(ctx context.Context, s *Store) ([]aliasPathPair, error) {
 	const qAliases = `SELECT alias_normalized, source_path FROM page_aliases WHERE user_id = ?`
 	rows, err := s.db.QueryContext(ctx, qAliases, storeUserID(ctx))
 	if err != nil {
-		return hits, fmt.Errorf("list aliases: %w", err)
+		return nil, fmt.Errorf("list aliases: %w", err)
 	}
 	defer rows.Close()
-
-	type pair struct {
-		alias string
-		path  string
-	}
-	var pairs []pair
+	var pairs []aliasPathPair
 	for rows.Next() {
 		var a, p string
 		if err := rows.Scan(&a, &p); err != nil {
-			return hits, fmt.Errorf("scan alias: %w", err)
+			return nil, fmt.Errorf("scan alias: %w", err)
 		}
-		pairs = append(pairs, pair{alias: strings.ToLower(a), path: p})
+		pairs = append(pairs, aliasPathPair{alias: strings.ToLower(a), path: p})
 	}
 	if err := rows.Err(); err != nil {
-		return hits, err
+		return nil, err
 	}
+	return pairs, nil
+}
 
-	for _, pr := range pairs {
-		ok := true
-		for _, t := range toks {
-			if !strings.Contains(pr.alias, strings.ToLower(t)) {
-				ok = false
-				break
-			}
+func aliasMatchesAllTokens(alias string, toks []string) bool {
+	for _, t := range toks {
+		if !strings.Contains(alias, strings.ToLower(t)) {
+			return false
 		}
-		if !ok {
+	}
+	return true
+}
+
+func (s *Store) appendAliasFTSHits(ctx context.Context, hits []BlockSearchHit, seen map[string]struct{}, pairs []aliasPathPair, toks []string, limit int) []BlockSearchHit {
+	uid := storeUserID(ctx)
+	for _, pr := range pairs {
+		if !aliasMatchesAllTokens(pr.alias, toks) {
 			continue
 		}
 		if _, dup := seen[pr.path]; dup {
 			continue
 		}
 		seen[pr.path] = struct{}{}
-		b, err := s.firstBlockRowBySourcePath(ctx, pr.path, storeUserID(ctx))
+		b, err := s.firstBlockRowBySourcePath(ctx, pr.path, uid)
 		if err != nil {
 			continue
 		}
@@ -167,7 +180,7 @@ func (s *Store) SearchBlocksFTSWithAliases(ctx context.Context, query string, li
 			break
 		}
 	}
-	return hits, nil
+	return hits
 }
 
 func (s *Store) firstBlockRowBySourcePath(ctx context.Context, sourcePath, userID string) (*BlockRow, error) {

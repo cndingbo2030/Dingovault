@@ -22,6 +22,7 @@
     "aboutBody": "本地优先大纲工具：Markdown 块、全文检索与可选云端同步。详见仓库 README 的安装、SaaS 模式与安全说明。",
     "close": "关闭",
     "pageGraph": "页面图谱",
+    "graphSemantic": "语义关联",
     "multiSelect": "多选",
     "copyText": "复制文本",
     "clear": "清除",
@@ -56,5 +57,52 @@
     "empty": "还没有其他页面链接到这里。",
     "emptyTitle": "暂无反向链接",
     "emptyHint": "当其他笔记通过 [[双向链接]] 指向本页时，引用将显示在此处。"
+  },
+  "sidebar": {
+    "aria": "侧栏",
+    "tablist": "侧栏面板",
+    "tabBacklinks": "反向链接",
+    "tabAI": "AI 对话"
+  },
+  "semantic": {
+    "aria": "语义相关块",
+    "title": "语义相关",
+    "loading": "正在查找相关笔记…",
+    "empty": "其他页面暂无强语义匹配。请先完成向量索引后再试。"
+  },
+  "outline": {
+    "aiTitle": "行内 AI",
+    "aiPlaceholder": "例如：概括此条、修正语法、翻译成日语…",
+    "aiRun": "运行",
+    "aiCancel": "取消",
+    "tagHint": "推荐标签：",
+    "tagSuggestAria": "标签建议",
+    "aiConnectionLost": "连接已断开 — 请确认本地 AI 服务已启动后再试。"
+  },
+  "aiChat": {
+    "aria": "AI 助手",
+    "title": "AI 对话",
+    "contextHint": "当前页面：{path}",
+    "ragHint": "结合本页与全库相似块（当前：{path}）",
+    "semanticTopK": "语义上下文条数（Top K）",
+    "systemPrompt": "系统提示词（AI 行为）",
+    "systemPromptPlaceholder": "在使用仓库上下文回答时，给助手的指令…",
+    "you": "你",
+    "assistant": "助手",
+    "thinking": "思考中…",
+    "placeholder": "就本页提问…（Enter 发送，Shift+Enter 换行）",
+    "send": "发送",
+    "settings": "AI 设置",
+    "provider": "提供商",
+    "model": "模型",
+    "endpoint": "API 根地址",
+    "apiKey": "API 密钥",
+    "temperature": "温度",
+    "embeddingsModel": "向量模型",
+    "disableEmbeddings": "关闭后台向量索引（减轻本机负载）",
+    "saveSettings": "保存设置",
+    "loadingSettings": "正在加载设置…",
+    "settingsSaved": "已保存 AI 设置。",
+    "errorPrefix": "错误："
   }
 }

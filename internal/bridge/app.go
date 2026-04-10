@@ -239,6 +239,28 @@ func (a *App) GetWikiGraph() (storage.WikiGraph, error) {
 	return a.store.WikiGraph(ctx, a.notesRoot)
 }
 
+// GetSemanticGraphEdges returns page–page edges derived from embedding similarity (local SQLite only).
+func (a *App) GetSemanticGraphEdges() ([]storage.WikiGraphSemanticEdge, error) {
+	if a.store == nil {
+		return nil, fmt.Errorf("%s", a.t(locale.ErrStoreNotInit))
+	}
+	if a.notesRoot == "" {
+		return nil, fmt.Errorf("%s", a.t(locale.ErrNotesRootNotSet))
+	}
+	ctx := context.Background()
+	if a.ctx != nil {
+		ctx = a.ctx
+	}
+	c, err := config.Load()
+	if err != nil {
+		c = config.Default()
+	}
+	c.AI = config.NormalizeAISettings(c.AI)
+	const minCos float32 = 0.58
+	const maxEdges = 72
+	return a.store.SemanticPageEdges(ctx, c.AI.EmbeddingsModel, minCos, maxEdges)
+}
+
 // IndentBlock increases list indentation by two spaces for the block (and nested list lines under it).
 func (a *App) IndentBlock(blockID string) error {
 	if a.graph == nil {

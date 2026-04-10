@@ -8,7 +8,7 @@ import (
 
 // CurrentSchemaVersion is the PRAGMA user_version Dingovault expects after all migrations run.
 // Increment when adding a new migration step in RunSchemaMigrations.
-const CurrentSchemaVersion = 2
+const CurrentSchemaVersion = 3
 
 // ReadUserVersion returns SQLite PRAGMA user_version.
 func ReadUserVersion(ctx context.Context, db *sql.DB) (int, error) {
@@ -51,6 +51,10 @@ func RunSchemaMigrations(ctx context.Context, db *sql.DB) error {
 			if err := migrateV1ToV2(ctx, db); err != nil {
 				return fmt.Errorf("migrate 1→2: %w", err)
 			}
+		case 2:
+			if err := migrateV2ToV3(ctx, db); err != nil {
+				return fmt.Errorf("migrate 2→3: %w", err)
+			}
 		default:
 			return fmt.Errorf("internal error: unhandled schema step from version %d", v)
 		}
@@ -85,6 +89,31 @@ CREATE TABLE IF NOT EXISTS dingovault_meta (
 )`)
 	if err != nil {
 		return fmt.Errorf("dingovault_meta: %w", err)
+	}
+	return nil
+}
+
+// migrateV2ToV3 adds block_vectors for embedding storage (RAG groundwork; BLOB float32[]).
+func migrateV2ToV3(ctx context.Context, db *sql.DB) error {
+	_, err := db.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS block_vectors (
+	user_id TEXT NOT NULL DEFAULT 'local',
+	block_id TEXT NOT NULL,
+	model TEXT NOT NULL,
+	dim INTEGER NOT NULL,
+	embedding BLOB NOT NULL,
+	updated_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, block_id, model),
+	FOREIGN KEY (block_id) REFERENCES blocks(id) ON DELETE CASCADE
+)`)
+	if err != nil {
+		return fmt.Errorf("block_vectors: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_block_vectors_user ON block_vectors(user_id)`); err != nil {
+		return fmt.Errorf("idx_block_vectors_user: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_block_vectors_block ON block_vectors(block_id)`); err != nil {
+		return fmt.Errorf("idx_block_vectors_block: %w", err)
 	}
 	return nil
 }

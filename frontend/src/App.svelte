@@ -29,6 +29,7 @@
     GetTheme,
     SetTheme,
     GetWikiGraph,
+    GetSemanticGraphEdges,
     ReorderBlockBefore,
     GetAppVersion,
     GetLocale,
@@ -39,6 +40,8 @@
   import OutlineNode from './OutlineNode.svelte'
   import PageGraph from './PageGraph.svelte'
   import Backlinks from './Backlinks.svelte'
+  import SemanticRelated from './SemanticRelated.svelte'
+  import AIChatPanel from './AIChatPanel.svelte'
   import CommandPalette from './CommandPalette.svelte'
   import ToastStack from './ToastStack.svelte'
   import { touchRecentPage } from './recentPages.js'
@@ -70,10 +73,15 @@
   let selectedIds = []
   let graphOpen = false
   let aboutOpen = false
+  /** @type {'backlinks' | 'ai'} */
+  let sideTab = 'backlinks'
   /** @type {string} */
   let appVersion = ''
   /** @type {{ nodes: { id: string, label: string }[], edges: { source: string, target: string }[] }} */
   let graphData = { nodes: [], edges: [] }
+  /** @type {{ source: string, target: string, score: number }[]} */
+  let graphSemanticEdges = []
+  let graphSemanticOn = false
 
   /** @type {Record<string, number>} */
   let saveTimers = {}
@@ -169,8 +177,25 @@
     err = ''
     try {
       graphData = await GetWikiGraph()
+      graphSemanticEdges = []
+      graphSemanticOn = false
       graphOpen = true
     } catch (e) {
+      notifyErr(e)
+    }
+  }
+
+  async function toggleSemanticGraph() {
+    if (!graphSemanticOn) {
+      graphSemanticEdges = []
+      return
+    }
+    err = ''
+    try {
+      graphSemanticEdges = await GetSemanticGraphEdges()
+    } catch (e) {
+      graphSemanticOn = false
+      graphSemanticEdges = []
       notifyErr(e)
     }
   }
@@ -265,6 +290,16 @@
         return loadPage(pagePath)
       })
       .catch((e) => notifyErr(e))
+
+    EventsOn('ai-inline-chunk', (/** @type {any} */ payload) => {
+      window.dispatchEvent(new CustomEvent('dv-ai-chunk', { detail: payload }))
+    })
+    EventsOn('ai-inline-error', (/** @type {any} */ payload) => {
+      window.dispatchEvent(new CustomEvent('dv-ai-err', { detail: payload }))
+    })
+    EventsOn('ai-inline-done', (/** @type {any} */ payload) => {
+      window.dispatchEvent(new CustomEvent('dv-ai-done', { detail: payload }))
+    })
 
     EventsOn('file-updated', async (payload) => {
       indexEpoch++
@@ -578,7 +613,7 @@
           <div class="about-logo">D</div>
         </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.2.0'}</p>
+        <p class="about-ver">{appVersion || 'v1.3.0'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>
@@ -595,9 +630,19 @@
     >
       <div class="graph-head">
         <h2>{T('app.pageGraph')}</h2>
-        <button type="button" class="btn secondary sm" on:click={() => (graphOpen = false)}>{T('app.close')}</button>
+        <div class="graph-head-actions">
+          <label class="graph-semantic-toggle">
+            <input
+              type="checkbox"
+              bind:checked={graphSemanticOn}
+              on:change={() => toggleSemanticGraph()}
+            />
+            <span>{T('app.graphSemantic')}</span>
+          </label>
+          <button type="button" class="btn secondary sm" on:click={() => (graphOpen = false)}>{T('app.close')}</button>
+        </div>
       </div>
-      <PageGraph graph={graphData} />
+      <PageGraph graph={graphData} semanticEdges={graphSemanticEdges} semanticOn={graphSemanticOn} />
     </section>
   {/if}
 
@@ -649,9 +694,47 @@
         />
       {/each}
     {/if}
-  </section>
+    </section>
 
-  <Backlinks {notesRoot} {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
+  <SemanticRelated {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
+
+  <aside class="dv-sidebar" aria-label={T('sidebar.aria')}>
+    <div class="side-tabs" role="tablist" aria-label={T('sidebar.tablist')}>
+      <button
+        type="button"
+        role="tab"
+        class="side-tab"
+        class:active={sideTab === 'backlinks'}
+        aria-selected={sideTab === 'backlinks'}
+        id="tab-backlinks"
+        on:click={() => (sideTab = 'backlinks')}
+      >
+        {T('sidebar.tabBacklinks')}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="side-tab"
+        class:active={sideTab === 'ai'}
+        aria-selected={sideTab === 'ai'}
+        id="tab-ai"
+        on:click={() => (sideTab = 'ai')}
+      >
+        {T('sidebar.tabAI')}
+      </button>
+    </div>
+    <div
+      class="side-panel"
+      role="tabpanel"
+      aria-labelledby={sideTab === 'backlinks' ? 'tab-backlinks' : 'tab-ai'}
+    >
+      {#if sideTab === 'backlinks'}
+        <Backlinks {notesRoot} {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
+      {:else}
+        <AIChatPanel {pagePath} />
+      {/if}
+    </div>
+  </aside>
 
   {#if $sidebarEntries.length}
     <aside
@@ -1021,6 +1104,22 @@
     letter-spacing: 0.06em;
     opacity: 0.55;
   }
+  .graph-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .graph-semantic-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    opacity: 0.8;
+    cursor: pointer;
+    user-select: none;
+  }
   .hint {
     margin-top: 24px;
     font-size: 0.8rem;
@@ -1028,6 +1127,38 @@
   }
   .plugin-tb {
     font-size: 0.85rem;
+  }
+  .dv-sidebar {
+    margin-top: 20px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-fg) 4%, transparent);
+  }
+  .side-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .side-tab {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+    color: inherit;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    opacity: 0.65;
+  }
+  .side-tab.active {
+    opacity: 1;
+    border-color: rgba(120, 160, 255, 0.35);
+    background: rgba(80, 120, 255, 0.1);
+  }
+  .side-panel {
+    min-height: 120px;
   }
   .plugin-sidebar {
     margin-top: 20px;

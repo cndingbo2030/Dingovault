@@ -21,6 +21,52 @@ type Config struct {
 	CloudMode   bool   `json:"cloudMode,omitempty"`
 	CloudAPIURL string `json:"cloudApiUrl,omitempty"`
 	CloudToken  string `json:"cloudToken,omitempty"` // JWT; keep machine-local — never commit this file from ~/.config
+	// AI configures local (Ollama) or cloud (OpenAI) LLM + embeddings.
+	AI AISettings `json:"ai,omitempty"`
+}
+
+// AISettings is persisted in config.json alongside vault preferences.
+type AISettings struct {
+	Provider        string  `json:"provider,omitempty"`        // "ollama" | "openai"
+	Model           string  `json:"model,omitempty"`         // chat model name
+	Endpoint        string  `json:"endpoint,omitempty"`      // Ollama base URL or OpenAI API root (optional)
+	APIKey          string  `json:"apiKey,omitempty"`        // OpenAI key; keep local
+	Temperature     float64 `json:"temperature,omitempty"`   // sampling temperature
+	EmbeddingsModel string  `json:"embeddingsModel,omitempty"` // separate embedding model (e.g. nomic-embed-text)
+	// DisableEmbeddings skips background embedding writes after index (reduces load on Ollama/OpenAI).
+	DisableEmbeddings bool `json:"disableEmbeddings,omitempty"`
+	// SystemPrompt is sent as the system message for AI Chat (RAG). Empty uses the built-in default.
+	SystemPrompt string `json:"systemPrompt,omitempty"`
+	// SemanticTopK is how many similar blocks from the vault to inject as RAG context (0 = default 8).
+	SemanticTopK int `json:"semanticTopK,omitempty"`
+}
+
+// NormalizeAISettings fills empty fields with defaults (safe for API calls).
+func NormalizeAISettings(a AISettings) AISettings {
+	d := Default().AI
+	out := a
+	if strings.TrimSpace(out.Provider) == "" {
+		out.Provider = d.Provider
+	}
+	if strings.TrimSpace(out.Model) == "" {
+		out.Model = d.Model
+	}
+	if strings.TrimSpace(out.Endpoint) == "" {
+		out.Endpoint = d.Endpoint
+	}
+	if out.Temperature <= 0 {
+		out.Temperature = d.Temperature
+	}
+	if !out.DisableEmbeddings && strings.TrimSpace(out.EmbeddingsModel) == "" {
+		out.EmbeddingsModel = d.EmbeddingsModel
+	}
+	if strings.TrimSpace(out.SystemPrompt) == "" {
+		out.SystemPrompt = d.SystemPrompt
+	}
+	if out.SemanticTopK <= 0 {
+		out.SemanticTopK = d.SemanticTopK
+	}
+	return out
 }
 
 // Window holds last known frame geometry.
@@ -57,6 +103,17 @@ func Default() Config {
 			Width:  1280,
 			Height: 800,
 		},
+		AI: AISettings{
+			Provider:        "ollama",
+			Model:           "llama3.2",
+			Endpoint:        "http://127.0.0.1:11434",
+			Temperature:     0.7,
+			EmbeddingsModel: "nomic-embed-text",
+			SystemPrompt: "You are Dingovault AI. Answer using only the provided context from the user's vault " +
+				"(current page and semantically related blocks). If the answer is not supported by that context, " +
+				"say clearly that you do not know or cannot find it in the vault.",
+			SemanticTopK: 8,
+		},
 	}
 }
 
@@ -86,6 +143,7 @@ func Load() (Config, error) {
 	if c.Theme == "" {
 		c.Theme = "dark"
 	}
+	c.AI = NormalizeAISettings(c.AI)
 	return c, nil
 }
 

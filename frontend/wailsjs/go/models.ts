@@ -1,5 +1,33 @@
 export namespace bridge {
 	
+	export class AISettingsDTO {
+	    provider: string;
+	    model: string;
+	    endpoint: string;
+	    apiKey: string;
+	    temperature: number;
+	    embeddingsModel: string;
+	    disableEmbeddings: boolean;
+	    systemPrompt: string;
+	    semanticTopK: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AISettingsDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.model = source["model"];
+	        this.endpoint = source["endpoint"];
+	        this.apiKey = source["apiKey"];
+	        this.temperature = source["temperature"];
+	        this.embeddingsModel = source["embeddingsModel"];
+	        this.disableEmbeddings = source["disableEmbeddings"];
+	        this.systemPrompt = source["systemPrompt"];
+	        this.semanticTopK = source["semanticTopK"];
+	    }
+	}
 	export class PageBlock {
 	    id: string;
 	    parentId: string;
@@ -39,6 +67,26 @@ export namespace bridge {
 		    }
 		    return a;
 		}
+	}
+	export class SemanticRelatedDTO {
+	    blockId: string;
+	    sourcePath: string;
+	    relPath: string;
+	    preview: string;
+	    score: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SemanticRelatedDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.blockId = source["blockId"];
+	        this.sourcePath = source["sourcePath"];
+	        this.relPath = source["relPath"];
+	        this.preview = source["preview"];
+	        this.score = source["score"];
+	    }
 	}
 
 }
@@ -217,6 +265,23 @@ export namespace storage {
 		}
 	}
 	
+	
+	export class WikiGraphSemanticEdge {
+	    source: string;
+	    target: string;
+	    score: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WikiGraphSemanticEdge(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.target = source["target"];
+	        this.score = source["score"];
+	    }
+	}
 
 }
 

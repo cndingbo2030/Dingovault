@@ -34,31 +34,7 @@ func EnsureDemoVaultFromFS(fsys fs.FS, rootInFS string) (absDest string, err err
 	}
 
 	err = fs.WalkDir(fsys, rootInFS, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		rel, ok := strings.CutPrefix(path, rootInFS+"/")
-		if !ok {
-			if path == rootInFS {
-				return nil
-			}
-			return fmt.Errorf("unexpected embed path %q", path)
-		}
-		if rel == "" {
-			return nil
-		}
-		out := filepath.Join(dest, filepath.FromSlash(rel))
-		if d.IsDir() {
-			return os.MkdirAll(out, 0o755)
-		}
-		b, rerr := fs.ReadFile(fsys, path)
-		if rerr != nil {
-			return rerr
-		}
-		if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(out, b, 0o644)
+		return demoWalkStep(fsys, rootInFS, dest, path, d, walkErr)
 	})
 	if err != nil {
 		_ = os.RemoveAll(dest)
@@ -69,6 +45,34 @@ func EnsureDemoVaultFromFS(fsys fs.FS, rootInFS string) (absDest string, err err
 		return "", err
 	}
 	return dest, nil
+}
+
+func demoWalkStep(fsys fs.FS, rootInFS, dest, path string, d fs.DirEntry, walkErr error) error {
+	if walkErr != nil {
+		return walkErr
+	}
+	rel, ok := strings.CutPrefix(path, rootInFS+"/")
+	if !ok {
+		if path == rootInFS {
+			return nil
+		}
+		return fmt.Errorf("unexpected embed path %q", path)
+	}
+	if rel == "" {
+		return nil
+	}
+	out := filepath.Join(dest, filepath.FromSlash(rel))
+	if d.IsDir() {
+		return os.MkdirAll(out, 0o755)
+	}
+	b, rerr := fs.ReadFile(fsys, path)
+	if rerr != nil {
+		return rerr
+	}
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(out, b, 0o644)
 }
 
 func shouldReuse(dest, verPath string) bool {

@@ -22,6 +22,7 @@
     "aboutBody": "Local-first outliner with Markdown blocks, FTS search, and optional cloud sync. See the repository README for setup, SaaS mode, and security notes.",
     "close": "Close",
     "pageGraph": "Page graph",
+    "graphSemantic": "Semantic connections",
     "multiSelect": "Multi-select",
     "copyText": "Copy text",
     "clear": "Clear",
@@ -56,5 +57,52 @@
     "empty": "No other pages link here yet.",
     "emptyTitle": "No backlinks yet",
     "emptyHint": "When another note links to this page with [[wikilinks]], those references show up here."
+  },
+  "sidebar": {
+    "aria": "Side panel",
+    "tablist": "Sidebar panels",
+    "tabBacklinks": "Backlinks",
+    "tabAI": "AI Chat"
+  },
+  "semantic": {
+    "aria": "Semantically related blocks",
+    "title": "Semantically related",
+    "loading": "Finding related notes…",
+    "empty": "No strong semantic matches on other pages yet. Index embeddings and try again."
+  },
+  "outline": {
+    "aiTitle": "Inline AI",
+    "aiPlaceholder": "e.g. Summarize this bullet, fix grammar, translate to Japanese…",
+    "aiRun": "Run",
+    "aiCancel": "Cancel",
+    "tagHint": "Suggested tags:",
+    "tagSuggestAria": "Tag suggestions",
+    "aiConnectionLost": "Connection lost — check that your AI server is running, then try again."
+  },
+  "aiChat": {
+    "aria": "AI assistant",
+    "title": "AI Chat",
+    "contextHint": "Current page: {path}",
+    "ragHint": "Uses this page plus similar blocks across the vault (current: {path})",
+    "semanticTopK": "Semantic context blocks (top K)",
+    "systemPrompt": "System prompt (AI behavior)",
+    "systemPromptPlaceholder": "Instructions for the assistant when answering with vault context…",
+    "you": "You",
+    "assistant": "Assistant",
+    "thinking": "Thinking…",
+    "placeholder": "Ask about this page… (Enter to send, Shift+Enter for newline)",
+    "send": "Send",
+    "settings": "AI settings",
+    "provider": "Provider",
+    "model": "Model",
+    "endpoint": "API base URL",
+    "apiKey": "API key",
+    "temperature": "Temperature",
+    "embeddingsModel": "Embeddings model",
+    "disableEmbeddings": "Disable background embeddings (lighter on CPU / GPU)",
+    "saveSettings": "Save settings",
+    "loadingSettings": "Loading settings…",
+    "settingsSaved": "AI settings saved.",
+    "errorPrefix": "Error: "
   }
 }

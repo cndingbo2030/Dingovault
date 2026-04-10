@@ -16,12 +16,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cndingbo2030/dingovault/internal/ai"
 	"github.com/cndingbo2030/dingovault/internal/auth"
 	"github.com/cndingbo2030/dingovault/internal/blob"
 	"github.com/cndingbo2030/dingovault/internal/bus"
 	"github.com/cndingbo2030/dingovault/internal/config"
 	"github.com/cndingbo2030/dingovault/internal/graph"
 	"github.com/cndingbo2030/dingovault/internal/parser"
+	"github.com/cndingbo2030/dingovault/internal/plugins/embeddings"
 	"github.com/cndingbo2030/dingovault/internal/plugins/summarizer"
 	"github.com/cndingbo2030/dingovault/internal/scanner"
 	"github.com/cndingbo2030/dingovault/internal/server"
@@ -105,11 +107,24 @@ func closeStore(store *storage.Store) {
 }
 
 func setupGraph(store storage.Provider) *graph.Service {
+	cfg, err := config.Load()
+	if err != nil {
+		cfg = config.Default()
+	}
 	engine := parser.NewEngine()
 	graphSvc := graph.NewService(store, engine)
 	eventBus := bus.New()
 	graphSvc.SetBus(eventBus)
-	_ = summarizer.Register(eventBus, store, engine)
+	aiProv, err := ai.NewProvider(cfg.AI)
+	if err != nil {
+		log.Printf("ai provider: %v (LLM features use offline fallback where possible)", err)
+	}
+	var llm ai.LLMProvider
+	if err == nil {
+		llm = aiProv
+	}
+	_ = summarizer.Register(eventBus, store, engine, llm)
+	_ = embeddings.Register(eventBus, store, llm)
 	return graphSvc
 }
 

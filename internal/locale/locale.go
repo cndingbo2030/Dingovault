@@ -14,6 +14,9 @@ const (
 	ErrReadPage          = "err.read_page"
 	ErrWriteExport       = "err.write_export"
 	ErrLocaleUnsupported = "err.locale_unsupported"
+	ErrAIKeyRequired     = "err.ai_key_required"
+	ErrAIEmptyMessage       = "err.ai_empty_message"
+	ErrAIEmptyInstruction   = "err.ai_empty_instruction"
 )
 
 // Normalize maps BCP 47 and legacy tags to supported UI locales.

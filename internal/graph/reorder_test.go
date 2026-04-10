@@ -12,12 +12,13 @@ import (
 	"github.com/cndingbo2030/dingovault/internal/tenant"
 )
 
-func TestReorderSiblingBefore_ListItems(t *testing.T) {
+func reorderListFixture(t *testing.T) (svc *Service, mdPath, idA, idC string, ctx context.Context) {
+	t.Helper()
 	t.Parallel()
 	dir := t.TempDir()
-	md := filepath.Join(dir, "p.md")
+	mdPath = filepath.Join(dir, "p.md")
 	body := "- a\n- b\n- c\n"
-	if err := os.WriteFile(md, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(mdPath, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -29,17 +30,16 @@ func TestReorderSiblingBefore_ListItems(t *testing.T) {
 	t.Cleanup(func() { _ = store.Close() })
 
 	eng := parser.NewEngine()
-	svc := NewService(store, eng)
-	ctx := tenant.WithUserID(context.Background(), tenant.LocalUserID)
-	if err := svc.ReindexFile(ctx, md); err != nil {
+	svc = NewService(store, eng)
+	ctx = tenant.WithUserID(context.Background(), tenant.LocalUserID)
+	if err := svc.ReindexFile(ctx, mdPath); err != nil {
 		t.Fatal(err)
 	}
 
-	blocks, err := store.ListDomainBlocksBySourcePath(ctx, md)
+	blocks, err := store.ListDomainBlocksBySourcePath(ctx, mdPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var idA, idC string
 	for _, b := range blocks {
 		switch strings.TrimSpace(b.Content) {
 		case "a":
@@ -51,6 +51,11 @@ func TestReorderSiblingBefore_ListItems(t *testing.T) {
 	if idA == "" || idC == "" {
 		t.Fatalf("blocks not found: %+v", blocks)
 	}
+	return svc, mdPath, idA, idC, ctx
+}
+
+func TestReorderSiblingBefore_ListItems(t *testing.T) {
+	svc, md, idA, idC, ctx := reorderListFixture(t)
 
 	// Move "c" before "a" → c, a, b
 	if err := svc.ReorderSiblingBefore(ctx, idC, idA); err != nil {
