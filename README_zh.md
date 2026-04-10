@@ -23,6 +23,14 @@ Go 模块路径：**`github.com/cndingbo2030/dingovault`**
 
 Dingovault 以 Markdown 块（block）为核心，提供 FTS5 全文搜索、双链、YAML Frontmatter 与桌面端体验。通过统一的 `storage.Provider` 抽象，同一套业务逻辑可运行在本地 SQLite 或远程 SaaS API。
 
+## 为什么选择 Dingovault？
+
+**快到像没有等待。** Dingovault 为「住在笔记里」的人优化：本地热路径下 **FTS 全文检索 p50 常见约 1ms 量级**，页面加载同样追求 **亚毫秒级体感**（因硬件而异，请用 `make benchmark` 自测）。找一条子弹不应先看完进度条。
+
+**数据在磁盘上也要「军事级」保密。** 通过 **`DINGO_MASTER_KEY`** 可启用 **AES-256-GCM** 静态加密，磁盘丢失不等于明文泄露；自托管 SaaS 时配合 **JWT** 鉴权，多用户场景也能收紧边界。
+
+**AI 不必把大脑上传到云端。** 优先对接 **Ollama** 等本地端点：行内辅助、仓库感知对话、可选向量嵌入都可以留在 **本机 GPU/CPU** 上完成，让「RAG」不必等于「把每一段笔记发给第三方模型」。
+
 ## v1.4.1 — 工作流修复与语义化发行文件名
 
 详见 **[CHANGELOG.md](CHANGELOG.md)**。
@@ -110,6 +118,25 @@ xattr -cr /Applications/Dingovault.app
 ```
 
 这是未进行 Apple 开发者签名的开源应用常见现象。
+
+## 容器镜像（GitHub Container Registry）
+
+每个 **`v*`** 标签会构建并推送 **SaaS 服务端** 镜像：
+
+```bash
+docker pull ghcr.io/cndingbo2030/dingovault:v1.4.1
+docker run --rm -p 12030:12030 -e DINGO_JWT_SECRET='至少16字符的密钥' -v dingovault-data:/data ghcr.io/cndingbo2030/dingovault:latest
+```
+
+详见仓库根目录 [`Dockerfile`](Dockerfile)。
+
+## 插件 SDK 占位包（GitHub Packages / npm）
+
+作用域包 **`@cndingbo2030/dingovault-sdk`** 在每次发版标签时从 [`sdk/`](sdk/) 发布（当前为占位，便于后续扩展类型与协议）。安装说明见 [`sdk/README.md`](sdk/README.md)。
+
+## 许可证
+
+本项目以 **GNU Affero General Public License v3.0（AGPL-3.0）** 授权 — 见 [`LICENSE`](LICENSE)。若您对 **网络服务** 提供修改后的版本，AGPL 要求向通过网络与您交互的用户提供对应源代码。
 
 ## 维护者
 

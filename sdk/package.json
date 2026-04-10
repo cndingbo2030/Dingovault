@@ -1,0 +1,31 @@
+{
+  "name": "@cndingbo2030/dingovault-sdk",
+  "version": "0.0.0",
+  "description": "Stub SDK for future Dingovault plugin and integration APIs. Version is set from the git tag at publish time.",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cndingbo2030/dingovault.git",
+    "directory": "sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/cndingbo2030/dingovault/issues"
+  },
+  "homepage": "https://github.com/cndingbo2030/dingovault#readme",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "keywords": [
+    "dingovault",
+    "pkm",
+    "zettelkasten",
+    "plugin-sdk"
+  ]
+}

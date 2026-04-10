@@ -64,4 +64,4 @@ Image elements that fail to load are swapped for a **placeholder** when `initIma
 
 ## License
 
-By contributing, you agree your contributions are licensed under the same terms as this repository (see [`LICENSE`](LICENSE)).
+By contributing, you agree your contributions are licensed under the same terms as this repository — **AGPL-3.0** (see [`LICENSE`](LICENSE)).

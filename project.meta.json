@@ -1,6 +1,7 @@
 {
   "upstreamGitRemote": "https://github.com/cndingbo2030/dingovault.git",
   "description": "Canonical upstream repository for Dingovault (CLI, Wails app, and future SaaS server).",
+  "license": "AGPL-3.0",
   "maintainer": "cndingbo2030",
   "contactEmail": "cndingbo@outlook.com"
 }

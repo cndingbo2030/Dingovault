@@ -1,14 +1,18 @@
 # Multi-stage SaaS API image (CLI server only — no Wails UI in container).
 FROM golang:1.25-alpine AS builder
+ARG VERSION=dev
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/dingovault ./cmd/dingovault
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+    -ldflags="-s -w -X github.com/cndingbo2030/dingovault/internal/version.String=${VERSION}" \
+    -o /out/dingovault ./cmd/dingovault
 
 FROM alpine:3.21
 LABEL org.opencontainers.image.source="https://github.com/cndingbo2030/dingovault"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
 RUN apk add --no-cache ca-certificates tzdata \
 	&& addgroup -g 10001 -S dingovault \
 	&& adduser -u 10001 -S -G dingovault -h /var/lib/dingovault dingovault

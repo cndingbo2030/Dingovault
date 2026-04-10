@@ -23,6 +23,16 @@ Go module path: **`github.com/cndingbo2030/dingovault`**
 
 Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikilinks, YAML frontmatter, and a clean desktop shell. The same core runs **offline** against embedded **SQLite** or **online** against your **self-hosted or managed SaaS API**—switchable via a small `storage.Provider` abstraction.
 
+## Why Dingovault?
+
+**Speed that feels like zero latency.** Dingovault is built for people who live in their notes. Full-text search over your vault is tuned until it is effectively **instant**—warm local runs are commonly around **~1ms median** for FTS queries and **sub‑millisecond** page loads on typical hardware (always measure yours with `make benchmark`). No spinners for “finding that one bullet.”
+
+**Military‑grade privacy for your words.** Your vault can sit behind **AES‑256‑GCM encryption at rest** (`DINGO_MASTER_KEY`), so disk theft does not mean plaintext theft. Pair that with **JWT‑protected** SaaS APIs when you self‑host the server, and you keep multi‑user deployments on a short leash.
+
+**AI without shipping your brain to the cloud.** Dingovault talks to **Ollama** and other local endpoints first: inline assist, vault‑aware chat, and optional embeddings stay **on your machine** when you want them to—so “RAG over my notes” does not have to mean “send every block to someone else’s GPU.”
+
+---
+
 ## v1.4.1 — Workflow fixes & semantic release filenames
 
 **Details:** [CHANGELOG.md](CHANGELOG.md).
@@ -62,10 +72,10 @@ Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikili
 - 100% clean-code push: complex paths refactored for better maintainability.
 - Enhanced macOS Gatekeeper guidance for unsigned app bundles.
 
-### Why teams pick Dingovault
+### Why teams pick Dingovault (technical checklist)
 
-- **Go performance that feels instant:** real-world benchmark runs are commonly around **~1ms FTS query p50** and **~0.2ms page load p50** on warm local storage (machine-dependent; run `make benchmark` to measure your hardware).
-- **Secure by default:** optional **AES-256-GCM** encryption at rest (`DINGO_MASTER_KEY`) plus JWT-protected SaaS APIs for multi-user deployments.
+- **Benchmarks, not vibes:** run **`make benchmark`** for **FTS p50 / page-load p50** on your disk (see *Why Dingovault?* above for typical ballparks).
+- **Encryption & SaaS hardening:** **`DINGO_MASTER_KEY`** (AES‑256‑GCM at rest) and **JWT**‑gated HTTP APIs for multi‑tenant or team installs.
 - **Plugin-ready architecture:** backend hooks (`before:block:save`, `after:block:indexed`) and frontend plugin slots make it easy to extend without forking core logic.
 
 ---
@@ -303,6 +313,21 @@ Also see `project.meta.json`.
 
 ---
 
+## Container image (GitHub Container Registry)
+
+On each **`v*`** tag, CI builds and pushes the **SaaS server** image:
+
+```bash
+docker pull ghcr.io/cndingbo2030/dingovault:v1.4.1
+docker run --rm -p 12030:12030 -e DINGO_JWT_SECRET='your-secret-at-least-16-chars' -v dingovault-data:/data ghcr.io/cndingbo2030/dingovault:latest
+```
+
+Image labels include **`org.opencontainers.image.source`** and **`AGPL-3.0`**. See [`Dockerfile`](Dockerfile).
+
+## Plugin SDK stub (GitHub Packages / npm)
+
+The scoped package **`@cndingbo2030/dingovault-sdk`** is published from [`sdk/`](sdk/) on each release tag (stub today; reserves the name for future typed APIs). Install instructions: [`sdk/README.md`](sdk/README.md).
+
 ## License
 
-This project is released under the **MIT License** — see [`LICENSE`](LICENSE).
+This project is licensed under the **GNU Affero General Public License v3.0** — see [`LICENSE`](LICENSE). If you run a **networked** modified version, AGPL requires you to offer corresponding source to users interacting with it over a network.
