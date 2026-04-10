@@ -20,10 +20,6 @@ type ollamaProvider struct {
 }
 
 func newOllama(s config.AISettings) *ollamaProvider {
-	base := strings.TrimRight(strings.TrimSpace(s.Endpoint), "/")
-	if base == "" {
-		base = "http://127.0.0.1:11434"
-	}
 	return &ollamaProvider{
 		cfg: s,
 		client: &http.Client{

@@ -20,10 +20,6 @@ type openAIProvider struct {
 }
 
 func newOpenAI(s config.AISettings) *openAIProvider {
-	base := strings.TrimRight(strings.TrimSpace(s.Endpoint), "/")
-	if base == "" {
-		base = "https://api.openai.com/v1"
-	}
 	return &openAIProvider{
 		cfg: s,
 		client: &http.Client{

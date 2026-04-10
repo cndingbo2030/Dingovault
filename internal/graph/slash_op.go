@@ -59,23 +59,45 @@ func validSlashOp(op string) bool {
 
 func applySlashOpToLines(lines []string, ls, le int, op string) ([]string, error) {
 	first := strings.TrimRight(lines[ls-1], "\r")
-	prefix, body, _ := splitMarkdownPrefix(first)
 	switch op {
 	case "today":
-		lines[ls-1] = prefix + buildTodayBody(body)
+		return applySlashToday(lines, ls, first)
 	case "todo":
-		lines[ls-1] = prefix + forceTodoBody(body)
+		return applySlashTodo(lines, ls, first)
 	case "h1", "h2", "h3":
-		line, err := buildHeadingLine(op, body)
-		if err != nil {
-			return nil, err
-		}
-		lines[ls-1] = line
+		return applySlashHeading(lines, ls, op, first)
 	case "code":
-		lines = replaceLineRange(lines, ls, le, buildCodeFenceChunk(body))
+		return applySlashCodeBlock(lines, ls, le, first)
 	default:
 		return nil, fmt.Errorf("unhandled op %q", op)
 	}
+}
+
+func applySlashToday(lines []string, ls int, firstLine string) ([]string, error) {
+	prefix, body, _ := splitMarkdownPrefix(firstLine)
+	lines[ls-1] = prefix + buildTodayBody(body)
+	return lines, nil
+}
+
+func applySlashTodo(lines []string, ls int, firstLine string) ([]string, error) {
+	prefix, body, _ := splitMarkdownPrefix(firstLine)
+	lines[ls-1] = prefix + forceTodoBody(body)
+	return lines, nil
+}
+
+func applySlashHeading(lines []string, ls int, op, firstLine string) ([]string, error) {
+	_, body, _ := splitMarkdownPrefix(firstLine)
+	line, err := buildHeadingLine(op, body)
+	if err != nil {
+		return nil, err
+	}
+	lines[ls-1] = line
+	return lines, nil
+}
+
+func applySlashCodeBlock(lines []string, ls, le int, firstLine string) ([]string, error) {
+	_, body, _ := splitMarkdownPrefix(firstLine)
+	lines = replaceLineRange(lines, ls, le, buildCodeFenceChunk(body))
 	return lines, nil
 }
 

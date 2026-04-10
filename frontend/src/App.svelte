@@ -613,7 +613,7 @@
           <div class="about-logo">D</div>
         </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.3.0'}</p>
+        <p class="about-ver">{appVersion || 'v1.3.1'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>

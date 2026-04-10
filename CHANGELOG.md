@@ -2,6 +2,23 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
+## v1.3.1 — Stable sync & LAN discovery (2026-04-10)
+
+### Keep the same vault on every device
+
+Connect Dingovault to a **WebDAV** folder (Nextcloud, ownCloud, a NAS, or any standards-compliant server). One action syncs your Markdown notes both ways. If two copies diverge in meaningful ways, Dingovault keeps **both**: your version is saved next to the main file as a `*.conflict.md` sibling so nothing is silently lost.
+
+### Find teammates on Wi‑Fi
+
+On a trusted local network, Dingovault can **announce itself** and **discover other desktops** running the app. Pair with a short **4-digit PIN** to copy WebDAV sync settings from one machine to another—handy when you would rather not re-type URLs and passwords.
+
+### Polish
+
+- Cleaner AI provider setup code and small parser/readability tweaks.
+- `gofmt -s` and linter-driven cleanups for a smoother Go Report Card experience.
+
+---
+
 ## v1.3.0 — AI writing & smart links (2026-04-10)
 
 ### Real-time AI writing

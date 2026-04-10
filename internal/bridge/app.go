@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/cndingbo2030/dingovault/internal/config"
 	"github.com/cndingbo2030/dingovault/internal/domain"
@@ -23,6 +24,9 @@ type App struct {
 	store     storage.Provider
 	graph     *graph.Service
 	notesRoot string
+
+	lanMu   sync.Mutex
+	stopLAN func()
 }
 
 // NewApp constructs the bridge.

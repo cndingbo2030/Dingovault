@@ -29,6 +29,8 @@ export function GetSemanticGraphEdges():Promise<Array<storage.WikiGraphSemanticE
 
 export function GetSemanticRelatedForPage(arg1:string,arg2:number):Promise<Array<bridge.SemanticRelatedDTO>>;
 
+export function GetSyncSettings():Promise<bridge.SyncSettingsDTO>;
+
 export function GetTheme():Promise<string>;
 
 export function GetWikiGraph():Promise<storage.WikiGraph>;
@@ -41,9 +43,13 @@ export function ListPagesByProperty(arg1:string,arg2:string):Promise<Array<strin
 
 export function ListVaultPages():Promise<Array<string>>;
 
+export function ListLANSyncPeers():Promise<Array<bridge.LANPeerDTO>>;
+
 export function NotesRoot():Promise<string>;
 
 export function OutdentBlock(arg1:string):Promise<void>;
+
+export function PairLANSyncWith(arg1:string,arg2:number,arg3:string):Promise<void>;
 
 export function QueryBlocks(arg1:string):Promise<Array<domain.Block>>;
 
@@ -57,12 +63,20 @@ export function SetAISettings(arg1:bridge.AISettingsDTO):Promise<void>;
 
 export function SetLocale(arg1:string):Promise<void>;
 
+export function SetSyncSettings(arg1:bridge.SyncSettingsDTO):Promise<void>;
+
 export function SetTheme(arg1:string):Promise<void>;
 
 export function StartAIInlineStream(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function StartLANSyncAdvertise():Promise<string>;
+
+export function StopLANSyncAdvertise():Promise<void>;
+
 export function Startup(arg1:context.Context):Promise<void>;
 
 export function SuggestTagsForBlock(arg1:string):Promise<Array<string>>;
+
+export function SyncVaultWebDAV():Promise<void>;
 
 export function UpdateBlock(arg1:string,arg2:string):Promise<void>;

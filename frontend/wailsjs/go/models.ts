@@ -88,6 +88,48 @@ export namespace bridge {
 	        this.score = source["score"];
 	    }
 	}
+	export class SyncSettingsDTO {
+	    webdavUrl: string;
+	    webdavUser: string;
+	    webdavPassword: string;
+	    webdavRemoteRoot: string;
+	    pairingPort: number;
+	    lanInstanceName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncSettingsDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.webdavUrl = source["webdavUrl"];
+	        this.webdavUser = source["webdavUser"];
+	        this.webdavPassword = source["webdavPassword"];
+	        this.webdavRemoteRoot = source["webdavRemoteRoot"];
+	        this.pairingPort = source["pairingPort"];
+	        this.lanInstanceName = source["lanInstanceName"];
+	    }
+	}
+	export class LANPeerDTO {
+	    name: string;
+	    host: string;
+	    ip: string;
+	    port: number;
+	    txt?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new LANPeerDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.ip = source["ip"];
+	        this.port = source["port"];
+	        this.txt = source["txt"];
+	    }
+	}
 
 }
 

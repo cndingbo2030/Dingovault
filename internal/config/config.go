@@ -23,15 +23,31 @@ type Config struct {
 	CloudToken  string `json:"cloudToken,omitempty"` // JWT; keep machine-local — never commit this file from ~/.config
 	// AI configures local (Ollama) or cloud (OpenAI) LLM + embeddings.
 	AI AISettings `json:"ai,omitempty"`
+	// Sync holds optional WebDAV mirror settings and LAN pairing (credentials stay on this machine only).
+	Sync SyncSettings `json:"sync,omitempty"`
+}
+
+// SyncSettings configures WebDAV vault mirror and optional mDNS + PIN pairing on the LAN.
+type SyncSettings struct {
+	WebDAVURL        string `json:"webdavUrl,omitempty"`
+	WebDAVUser       string `json:"webdavUser,omitempty"`
+	WebDAVPassword   string `json:"webdavPassword,omitempty"`
+	WebDAVRemoteRoot string `json:"webdavRemoteRoot,omitempty"` // path prefix on server, e.g. /vault
+	// PairingPort is the TCP port for LAN PIN handshake (default 17375 when advertising).
+	PairingPort int `json:"pairingPort,omitempty"`
+	// AdvertiseLAN publishes this device via mDNS while pairing is active.
+	AdvertiseLAN bool `json:"advertiseLan,omitempty"`
+	// LANInstanceName is shown to other devices (default: hostname).
+	LANInstanceName string `json:"lanInstanceName,omitempty"`
 }
 
 // AISettings is persisted in config.json alongside vault preferences.
 type AISettings struct {
 	Provider        string  `json:"provider,omitempty"`        // "ollama" | "openai"
-	Model           string  `json:"model,omitempty"`         // chat model name
-	Endpoint        string  `json:"endpoint,omitempty"`      // Ollama base URL or OpenAI API root (optional)
-	APIKey          string  `json:"apiKey,omitempty"`        // OpenAI key; keep local
-	Temperature     float64 `json:"temperature,omitempty"`   // sampling temperature
+	Model           string  `json:"model,omitempty"`           // chat model name
+	Endpoint        string  `json:"endpoint,omitempty"`        // Ollama base URL or OpenAI API root (optional)
+	APIKey          string  `json:"apiKey,omitempty"`          // OpenAI key; keep local
+	Temperature     float64 `json:"temperature,omitempty"`     // sampling temperature
 	EmbeddingsModel string  `json:"embeddingsModel,omitempty"` // separate embedding model (e.g. nomic-embed-text)
 	// DisableEmbeddings skips background embedding writes after index (reduces load on Ollama/OpenAI).
 	DisableEmbeddings bool `json:"disableEmbeddings,omitempty"`
@@ -144,7 +160,17 @@ func Load() (Config, error) {
 		c.Theme = "dark"
 	}
 	c.AI = NormalizeAISettings(c.AI)
+	c.Sync = NormalizeSyncSettings(c.Sync)
 	return c, nil
+}
+
+// NormalizeSyncSettings fills defaults for sync-related fields.
+func NormalizeSyncSettings(s SyncSettings) SyncSettings {
+	out := s
+	if out.PairingPort <= 0 {
+		out.PairingPort = 17375
+	}
+	return out
 }
 
 // ShouldOpenBundledDemo is true when no vault was passed on the CLI and none is saved in config.

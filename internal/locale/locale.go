@@ -4,19 +4,19 @@ import "strings"
 
 // Well-known message keys (bridge and UI-adjacent errors).
 const (
-	ErrStoreNotInit      = "err.store_not_init"
-	ErrGraphNotInit      = "err.graph_not_init"
-	ErrNotesRootNotSet   = "err.notes_root_not_set"
-	ErrThemeInvalid      = "err.theme_invalid"
-	ErrResolvePath       = "err.resolve_path"
-	ErrNotMarkdown       = "err.not_markdown"
-	ErrListBlocks        = "err.list_blocks"
-	ErrReadPage          = "err.read_page"
-	ErrWriteExport       = "err.write_export"
-	ErrLocaleUnsupported = "err.locale_unsupported"
-	ErrAIKeyRequired     = "err.ai_key_required"
-	ErrAIEmptyMessage       = "err.ai_empty_message"
-	ErrAIEmptyInstruction   = "err.ai_empty_instruction"
+	ErrStoreNotInit       = "err.store_not_init"
+	ErrGraphNotInit       = "err.graph_not_init"
+	ErrNotesRootNotSet    = "err.notes_root_not_set"
+	ErrThemeInvalid       = "err.theme_invalid"
+	ErrResolvePath        = "err.resolve_path"
+	ErrNotMarkdown        = "err.not_markdown"
+	ErrListBlocks         = "err.list_blocks"
+	ErrReadPage           = "err.read_page"
+	ErrWriteExport        = "err.write_export"
+	ErrLocaleUnsupported  = "err.locale_unsupported"
+	ErrAIKeyRequired      = "err.ai_key_required"
+	ErrAIEmptyMessage     = "err.ai_empty_message"
+	ErrAIEmptyInstruction = "err.ai_empty_instruction"
 )
 
 // Normalize maps BCP 47 and legacy tags to supported UI locales.

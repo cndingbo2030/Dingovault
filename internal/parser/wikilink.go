@@ -22,13 +22,11 @@ func (w *wikilinkParser) Trigger() []byte {
 
 func (w *wikilinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Context) ast.Node {
 	savedLine, savedPos := block.Position()
-	line, _ := block.PeekLine()
-	if !startsWikilink(line) {
+	if !advancePastWikilinkOpenBracketPair(block) {
 		return nil
 	}
 
-	block.Advance(2)
-	line, _ = block.PeekLine()
+	line, _ := block.PeekLine()
 	if line == nil {
 		return rollback(block, savedLine, savedPos)
 	}
@@ -46,6 +44,16 @@ func (w *wikilinkParser) Parse(parent ast.Node, block text.Reader, pc parser.Con
 
 	block.Advance(closeIdx + 2)
 	return NewWikilink(target, alias)
+}
+
+// advancePastWikilinkOpenBracketPair consumes "[[" when present; otherwise leaves the reader unchanged.
+func advancePastWikilinkOpenBracketPair(block text.Reader) bool {
+	line, _ := block.PeekLine()
+	if !startsWikilink(line) {
+		return false
+	}
+	block.Advance(2)
+	return true
 }
 
 func startsWikilink(line []byte) bool {

@@ -50,6 +50,10 @@ export function GetSemanticRelatedForPage(arg1, arg2) {
   return window['go']['bridge']['App']['GetSemanticRelatedForPage'](arg1, arg2);
 }
 
+export function GetSyncSettings() {
+  return window['go']['bridge']['App']['GetSyncSettings']();
+}
+
 export function GetTheme() {
   return window['go']['bridge']['App']['GetTheme']();
 }
@@ -74,12 +78,20 @@ export function ListVaultPages() {
   return window['go']['bridge']['App']['ListVaultPages']();
 }
 
+export function ListLANSyncPeers() {
+  return window['go']['bridge']['App']['ListLANSyncPeers']();
+}
+
 export function NotesRoot() {
   return window['go']['bridge']['App']['NotesRoot']();
 }
 
 export function OutdentBlock(arg1) {
   return window['go']['bridge']['App']['OutdentBlock'](arg1);
+}
+
+export function PairLANSyncWith(arg1, arg2, arg3) {
+  return window['go']['bridge']['App']['PairLANSyncWith'](arg1, arg2, arg3);
 }
 
 export function QueryBlocks(arg1) {
@@ -106,6 +118,10 @@ export function SetLocale(arg1) {
   return window['go']['bridge']['App']['SetLocale'](arg1);
 }
 
+export function SetSyncSettings(arg1) {
+  return window['go']['bridge']['App']['SetSyncSettings'](arg1);
+}
+
 export function SetTheme(arg1) {
   return window['go']['bridge']['App']['SetTheme'](arg1);
 }
@@ -114,12 +130,24 @@ export function StartAIInlineStream(arg1, arg2, arg3) {
   return window['go']['bridge']['App']['StartAIInlineStream'](arg1, arg2, arg3);
 }
 
+export function StartLANSyncAdvertise() {
+  return window['go']['bridge']['App']['StartLANSyncAdvertise']();
+}
+
+export function StopLANSyncAdvertise() {
+  return window['go']['bridge']['App']['StopLANSyncAdvertise']();
+}
+
 export function Startup(arg1) {
   return window['go']['bridge']['App']['Startup'](arg1);
 }
 
 export function SuggestTagsForBlock(arg1) {
   return window['go']['bridge']['App']['SuggestTagsForBlock'](arg1);
+}
+
+export function SyncVaultWebDAV() {
+  return window['go']['bridge']['App']['SyncVaultWebDAV']();
 }
 
 export function UpdateBlock(arg1, arg2) {

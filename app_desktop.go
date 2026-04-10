@@ -195,6 +195,7 @@ func runDesktopApp(cfg config.Config, app *bridge.App, idx *scanner.Indexer, not
 			}()
 		},
 		OnShutdown: func(ctx context.Context) {
+			app.StopLANSyncAdvertise()
 			fresh, err := config.Load()
 			if err != nil {
 				log.Printf("config reload on shutdown: %v", err)
