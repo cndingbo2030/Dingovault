@@ -6,7 +6,7 @@ All notable user-facing changes for Dingovault are listed here. We describe what
 
 ### CI / Android
 
-GitHub Actions **release** builds set **ANDROID_HOME**, **ANDROID_NDK_HOME**, **NDK_HOME**, pin **cmdline-tools** for `setup-android`, install the **NDK** via the action’s package list, add a **`ndk-bundle` symlink** for gomobile, and run **`gomobile init` only after** the NDK is present. **Gradle `gradlew`** is explicitly **`chmod +x`**.
+GitHub Actions **release** builds set **ANDROID_HOME**, **ANDROID_NDK_HOME**, **NDK_HOME**, pin **cmdline-tools** for `setup-android`, install the **NDK** via the action’s package list, add a **`ndk-bundle` symlink** for gomobile, and run **`gomobile init` only after** the NDK is present. **Gradle `gradlew`** is explicitly **`chmod +x`**. The module pins **`golang.org/x/mobile`** (via `tools/tools.go`) so **gobind** can resolve **`golang.org/x/mobile/bind`** on the runner.
 
 ### Downloads
 
