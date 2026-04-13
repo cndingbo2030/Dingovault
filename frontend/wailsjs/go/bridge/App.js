@@ -34,6 +34,10 @@ export function GetBacklinks(arg1) {
   return window['go']['bridge']['App']['GetBacklinks'](arg1);
 }
 
+export function HealthResetLocalSearchIndex() {
+  return window['go']['bridge']['App']['HealthResetLocalSearchIndex']();
+}
+
 export function GetLocale() {
   return window['go']['bridge']['App']['GetLocale']();
 }

@@ -21,6 +21,8 @@ export function GetAppVersion():Promise<string>;
 
 export function GetBacklinks(arg1:string):Promise<Array<domain.Block>>;
 
+export function HealthResetLocalSearchIndex():Promise<void>;
+
 export function GetLocale():Promise<string>;
 
 export function GetPage(arg1:string):Promise<Array<bridge.PageBlock>>;

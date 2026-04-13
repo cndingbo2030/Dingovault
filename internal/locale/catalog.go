@@ -15,7 +15,9 @@ var catalog = map[string]map[string]string{
 		ErrLocaleUnsupported:  "Language must be en or zh-CN.",
 		ErrAIKeyRequired:      "OpenAI provider requires an API key.",
 		ErrAIEmptyMessage:     "Message is empty.",
-		ErrAIEmptyInstruction: "Instruction is empty.",
+		ErrAIEmptyInstruction:      "Instruction is empty.",
+		ErrHealthResetUnavailable:  "Database reset is not available in this build.",
+		ErrHealthResetCloud:        "Database reset is only supported for local vaults (not cloud mode).",
 	},
 	"zh-CN": {
 		ErrStoreNotInit:       "存储未初始化。",
@@ -30,6 +32,8 @@ var catalog = map[string]map[string]string{
 		ErrLocaleUnsupported:  "语言只能是 en 或 zh-CN。",
 		ErrAIKeyRequired:      "使用 OpenAI 时需要填写 API 密钥。",
 		ErrAIEmptyMessage:     "消息为空。",
-		ErrAIEmptyInstruction: "指令为空。",
+		ErrAIEmptyInstruction:      "指令为空。",
+		ErrHealthResetUnavailable:  "当前版本不支持重置本地数据库。",
+		ErrHealthResetCloud:        "云端模式下无法重置本地索引（仅支持本地仓库）。",
 	},
 }

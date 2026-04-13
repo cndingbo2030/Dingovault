@@ -45,6 +45,7 @@
     'GetAISettings',
     'GetAppVersion',
     'GetBacklinks',
+    'HealthResetLocalSearchIndex',
     'GetLocale',
     'GetPage',
     'GetSemanticGraphEdges',

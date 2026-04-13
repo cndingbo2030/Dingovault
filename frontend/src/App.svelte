@@ -34,7 +34,8 @@
     GetAppVersion,
     GetLocale,
     SetLocale,
-    IsAIReachable
+    IsAIReachable,
+    HealthResetLocalSearchIndex
   } from '../wailsjs/go/bridge/App.js'
   import { EventsOn } from '../wailsjs/runtime/runtime.js'
   import { locale, messages, tr, detectBrowserLocale, normalizeLocaleTag } from './lib/i18n/index.js'
@@ -48,6 +49,7 @@
   import { touchRecentPage } from './recentPages.js'
   import { pushToast } from './toastStore.js'
   import { toolbarEntries, sidebarEntries } from './pluginRegistry.js'
+  import { hapticLight } from './lib/haptic.js'
 
   let notesRoot = ''
   let pagePath = 'README.md'
@@ -81,7 +83,7 @@
   let sideSheetOpen = false
   /** @type {string[]} */
   let navStack = []
-  /** @type {'default' | 'phone-portrait' | 'phone-land' | 'tablet-land' | 'small-tablet'} */
+  /** @type {'default' | 'phone-portrait' | 'phone-land' | 'tablet-master' | 'small-tablet'} */
   let chromeMode = 'default'
 
   $: showMobileChrome =
@@ -109,8 +111,8 @@
     const w = window.innerWidth
     const h = window.innerHeight
     const land = w >= h
-    if (land && w >= 900) {
-      chromeMode = 'tablet-land'
+    if (w >= 900) {
+      chromeMode = 'tablet-master'
     } else if (w >= 600 && w < 900) {
       chromeMode = 'small-tablet'
     } else if (!land && w <= 599) {
@@ -272,6 +274,7 @@
 
   /** @param {string} id */
   async function handleSwipeTodo(id) {
+    hapticLight()
     err = ''
     try {
       await syncAllBlocksFromDOM()
@@ -285,6 +288,7 @@
   /** @param {string} id */
   async function handleSwipeClear(id) {
     if (typeof window !== 'undefined' && !window.confirm(T('app.confirmClearBlock'))) return
+    hapticLight()
     err = ''
     try {
       await syncAllBlocksFromDOM()
@@ -292,6 +296,23 @@
       await loadPage(pagePath, { focusBlockId: id })
     } catch (e) {
       notifyErr(e)
+    }
+  }
+
+  let healthBusy = false
+  async function runHealthReset() {
+    if (!confirm(T('app.healthResetConfirm'))) return
+    healthBusy = true
+    err = ''
+    try {
+      await HealthResetLocalSearchIndex()
+      indexEpoch++
+      await loadPage(pagePath, { skipHistory: true, softNav: true })
+      pushToast(T('app.healthResetDone'), 'info')
+    } catch (e) {
+      notifyErr(e)
+    } finally {
+      healthBusy = false
     }
   }
 
@@ -417,7 +438,18 @@
       const t = e.target
       if (t instanceof HTMLTextAreaElement && t.closest('.outliner-panel')) {
         requestAnimationFrame(() => {
-          t.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+          t.scrollIntoView({ block: 'center', behavior: 'smooth', inline: 'nearest' })
+          requestAnimationFrame(() => {
+            const vv = window.visualViewport
+            if (!vv) return
+            const r = t.getBoundingClientRect()
+            const navPad = 88
+            const bottomLimit = vv.height + vv.offsetTop - navPad
+            if (r.bottom > bottomLimit) {
+              const delta = r.bottom - bottomLimit + 12
+              window.scrollBy({ top: delta, behavior: 'smooth' })
+            }
+          })
         })
       }
     }
@@ -697,7 +729,7 @@
     {/if}
   </header>
 
-  <div class="toolbar">
+  <div class="toolbar" class:tool-ribbon={chromeMode === 'tablet-master'}>
     {#if chromeMode === 'small-tablet'}
       <button
         type="button"
@@ -712,45 +744,7 @@
     <button type="button" class="btn" on:click={() => loadPage(pagePath, { replaceTop: true })}
       >{T('app.open')}</button
     >
-    {#if showMobileChrome}
-      <button
-        type="button"
-        class="btn secondary icon-btn"
-        on:click={openOrCreate}
-        aria-label={T('app.ensurePage')}
-        title={T('app.ensurePage')}
-      >
-        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"
-          ><path
-            fill="currentColor"
-            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM12 11H8v2h4v4h2v-4h4v-2h-4V7h-2v4z"
-          /></svg
-        >
-      </button>
-      <button
-        type="button"
-        class="btn secondary icon-btn"
-        on:click={toggleTheme}
-        aria-label={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
-        title={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
-      >
-        {#if theme === 'dark'}
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"
-            ><path
-              fill="currentColor"
-              d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5h2v3h-2V2zm0 19h2v3h-2v-3zM2 11h3v2H2v-2zm19 0h3v2h-3v-2zM4.22 4.22l2.12 2.12-1.41 1.41L2.81 5.64 4.22 4.22zm12.73 12.73 2.12 2.12-1.41 1.41-2.12-2.12 1.41-1.41zM19.78 4.22l-2.12 2.12-1.41-1.41 2.12-2.12 1.41 1.41zM7.05 18.95l-2.12 2.12-1.41-1.41 2.12-2.12 1.41 1.41z"
-            /></svg
-          >
-        {:else}
-          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"
-            ><path
-              fill="currentColor"
-              d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
-            /></svg
-          >
-        {/if}
-      </button>
-    {:else}
+    {#if !showMobileChrome}
       <button type="button" class="btn secondary" on:click={openOrCreate}>{T('app.ensurePage')}</button>
       <button
         type="button"
@@ -812,11 +806,19 @@
           <div class="about-logo">D</div>
         </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.4.5'}</p>
+        <p class="about-ver">{appVersion || 'v1.4.6'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>
-        <button type="button" class="btn secondary" on:click={() => (aboutOpen = false)}>{T('app.close')}</button>
+        <div class="about-actions">
+          <button
+            type="button"
+            class="btn secondary"
+            disabled={healthBusy}
+            on:click={() => runHealthReset()}
+          >{T('app.healthReset')}</button>
+          <button type="button" class="btn secondary" on:click={() => (aboutOpen = false)}>{T('app.close')}</button>
+        </div>
       </div>
     </div>
   {/if}
@@ -859,6 +861,10 @@
   {/if}
 
   <div class="layout-grid" data-mobile-panel={mobilePanel}>
+  <div class="col-related-wrap col-gallery">
+    <SemanticRelated {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
+  </div>
+
   <section class="col-main outliner-panel">
     <h2>{T('app.outline')}</h2>
     {#if pageLoading}
@@ -904,10 +910,6 @@
       {/each}
     {/if}
     </section>
-
-  <div class="col-related-wrap">
-    <SemanticRelated {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
-  </div>
 
   <aside class="dv-sidebar col-side" aria-label={T('sidebar.aria')}>
     <div class="side-tabs" role="tablist" aria-label={T('sidebar.tablist')}>
@@ -968,6 +970,45 @@
         {T('app.hint')}
   </p>
 </main>
+
+{#if showMobileChrome}
+  <div class="mobile-fab-stack" aria-label={T('app.fabAria')}>
+    <button
+      type="button"
+      class="fab-btn"
+      on:click={toggleTheme}
+      aria-label={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+      title={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+    >
+      {#if theme === 'dark'}
+        <svg class="fab-ico" viewBox="0 0 24 24" aria-hidden="true"
+          ><path
+            fill="currentColor"
+            d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5h2v3h-2V2zm0 19h2v3h-2v-3zM2 11h3v2H2v-2zm19 0h3v2h-3v-2zM4.22 4.22l2.12 2.12-1.41 1.41L2.81 5.64 4.22 4.22zm12.73 12.73 2.12 2.12-1.41 1.41-2.12-2.12 1.41-1.41zM19.78 4.22l-2.12 2.12-1.41-1.41 2.12-2.12 1.41 1.41zM7.05 18.95l-2.12 2.12-1.41-1.41 2.12-2.12 1.41 1.41z"
+          /></svg
+        >
+      {:else}
+        <svg class="fab-ico" viewBox="0 0 24 24" aria-hidden="true"
+          ><path fill="currentColor" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg
+        >
+      {/if}
+    </button>
+    <button
+      type="button"
+      class="fab-btn fab-primary"
+      on:click={openOrCreate}
+      aria-label={T('app.ensurePage')}
+      title={T('app.ensurePage')}
+    >
+      <svg class="fab-ico" viewBox="0 0 24 24" aria-hidden="true"
+        ><path
+          fill="currentColor"
+          d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM12 11H8v2h4v4h2v-4h4v-2h-4V7h-2v4z"
+        /></svg
+      >
+    </button>
+  </div>
+{/if}
 
 <nav class="mobile-tabbar" aria-label={T('app.mobileNavAria')}>
   <button
@@ -1223,7 +1264,7 @@
       max(56px, calc(12px + env(safe-area-inset-bottom, 0px))) max(16px, env(safe-area-inset-right, 0px));
     box-sizing: border-box;
   }
-  main[data-chrome-mode='tablet-land'].layout {
+  main[data-chrome-mode='tablet-master'].layout {
     max-width: min(100%, 1440px);
   }
   .top {
@@ -1232,14 +1273,14 @@
     padding-top: max(0px, env(safe-area-inset-top, 0px));
     box-sizing: border-box;
   }
-  main[data-chrome-mode='tablet-land'] .top {
+  main[data-chrome-mode='tablet-master'] .top {
     min-height: 4.75rem;
     padding-bottom: 10px;
   }
-  main[data-chrome-mode='tablet-land'] .toolbar {
+  main[data-chrome-mode='tablet-master'] .toolbar {
     margin-top: 14px;
   }
-  main[data-chrome-mode='tablet-land'] .top h1 {
+  main[data-chrome-mode='tablet-master'] .top h1 {
     font-size: 1.62rem;
     line-height: 1.22;
   }
@@ -1256,11 +1297,6 @@
   }
   main[data-chrome-mode='phone-land'] .toolbar {
     margin-top: 10px;
-  }
-  @media (min-width: 900px) {
-    .layout {
-      max-width: min(100%, 1680px);
-    }
   }
   .layout-grid {
     display: block;
@@ -1294,65 +1330,47 @@
   }
 
   @media (min-width: 900px) {
-    main:not([data-chrome-mode='tablet-land']) .layout-grid {
+    .layout {
+      max-width: min(100%, 1680px);
+    }
+    main[data-chrome-mode='tablet-master'] .layout-grid {
       display: grid;
-      grid-template-columns: minmax(200px, 24%) minmax(300px, 1fr) minmax(240px, 26%);
-      gap: 16px;
+      grid-template-columns: minmax(196px, 22%) minmax(280px, 1fr) minmax(236px, 28%);
+      gap: 14px;
       align-items: start;
     }
-    main:not([data-chrome-mode='tablet-land']) .layout-grid .col-related-wrap :global(.semantic-related) {
+    main[data-chrome-mode='tablet-master'] .layout-grid .col-related-wrap :global(.semantic-related) {
       margin-top: 0;
     }
-    main:not([data-chrome-mode='tablet-land']) .layout-grid .dv-sidebar {
+    main[data-chrome-mode='tablet-master'] .layout-grid .dv-sidebar {
       margin-top: 0;
     }
-    main:not([data-chrome-mode='tablet-land']) .layout-grid .col-main.outliner-panel {
+    main[data-chrome-mode='tablet-master'] .layout-grid .col-main.outliner-panel {
       margin-top: 0;
     }
-  }
-  main[data-chrome-mode='tablet-land'] .layout-grid {
-    display: grid;
-    grid-template-columns: minmax(260px, 32%) minmax(0, 1fr);
-    gap: 16px;
-    align-items: start;
-  }
-  main[data-chrome-mode='tablet-land'] .layout-grid .dv-sidebar.col-side {
-    grid-column: 1;
-    grid-row: 1 / span 2;
-  }
-  main[data-chrome-mode='tablet-land'] .layout-grid .col-main.outliner-panel {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  main[data-chrome-mode='tablet-land'] .layout-grid .col-related-wrap {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  main[data-chrome-mode='tablet-land'] .layout-grid .col-related-wrap :global(.semantic-related) {
-    margin-top: 0;
   }
   .mobile-tabbar {
     display: none;
   }
   @media (max-width: 899px) {
-    main.layout:not([data-chrome-mode='tablet-land']) {
+    main.layout:not([data-chrome-mode='tablet-master']) {
       max-width: 100%;
       padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px))
         calc(12px + 56px + max(env(safe-area-inset-bottom, 0px), 12px)) max(12px, env(safe-area-inset-right, 0px));
     }
-    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='outline'] .col-related-wrap,
-    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='outline'] .col-side {
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='outline'] .col-related-wrap,
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='outline'] .col-side {
       display: none;
     }
-    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='related'] .col-main,
-    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='related'] .col-side {
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='related'] .col-main,
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='related'] .col-side {
       display: none;
     }
-    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='side'] .col-main,
-    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='side'] .col-related-wrap {
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='side'] .col-main,
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='side'] .col-related-wrap {
       display: none;
     }
-    main.layout:not([data-chrome-mode='tablet-land']) .mobile-tabbar {
+    main.layout:not([data-chrome-mode='tablet-master']) .mobile-tabbar {
       display: flex;
       position: fixed;
       z-index: 60;
@@ -1370,7 +1388,7 @@
       -webkit-backdrop-filter: blur(10px);
       backdrop-filter: blur(10px);
     }
-    main.layout:not([data-chrome-mode='tablet-land']) .mobile-tab-btn {
+    main.layout:not([data-chrome-mode='tablet-master']) .mobile-tab-btn {
       flex: 1;
       min-width: 0;
       min-height: 48px;
@@ -1389,7 +1407,7 @@
       gap: 2px;
       line-height: 1.15;
     }
-    main.layout:not([data-chrome-mode='tablet-land']) .mobile-tab-btn.active {
+    main.layout:not([data-chrome-mode='tablet-master']) .mobile-tab-btn.active {
       border-color: rgba(120, 160, 255, 0.45);
       background: rgba(80, 120, 255, 0.14);
     }
@@ -1458,6 +1476,20 @@
     margin-top: 16px;
     flex-wrap: wrap;
     align-items: center;
+  }
+  .toolbar.tool-ribbon {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    align-items: center;
+    padding-bottom: 2px;
+    gap: 10px;
+  }
+  main[data-chrome-mode='tablet-master'] .toolbar.tool-ribbon .path-input {
+    flex: 1 1 200px;
+    min-width: 140px;
+    max-width: min(360px, 42vw);
   }
   .icon-btn {
     display: inline-flex;
@@ -1557,7 +1589,7 @@
     font-size: 0.8rem;
   }
   @media (max-width: 899px) {
-    main.layout:not([data-chrome-mode='tablet-land']) .btn.sm {
+    main.layout:not([data-chrome-mode='tablet-master']) .btn.sm {
       min-height: 48px;
     }
   }
@@ -1616,6 +1648,55 @@
     font-size: 0.9rem;
     line-height: 1.5;
     opacity: 0.85;
+  }
+  .about-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .mobile-fab-stack {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right, 0px));
+    bottom: calc(64px + max(12px, env(safe-area-inset-bottom, 0px)));
+    z-index: 58;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+  .fab-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 1px solid var(--dv-border);
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--dv-panel) 92%, transparent);
+    color: var(--dv-fg);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+    touch-action: manipulation;
+    padding: 0;
+    cursor: pointer;
+  }
+  .fab-btn.fab-primary {
+    background: rgba(80, 120, 255, 0.35);
+    border-color: rgba(120, 160, 255, 0.45);
+  }
+  .fab-ico {
+    width: 24px;
+    height: 24px;
+    display: block;
+  }
+  main[data-chrome-mode='tablet-master'] .outliner-panel :global(.row) {
+    margin-bottom: 4px;
+  }
+  main[data-chrome-mode='tablet-master'] .outliner-panel :global(.row textarea) {
+    padding: 6px 8px;
+  }
+  .outliner-panel :global(textarea[data-block-id]) {
+    scroll-margin-bottom: max(96px, calc(56px + env(safe-area-inset-bottom, 0px)));
   }
   .graph-panel {
     margin-top: 16px;

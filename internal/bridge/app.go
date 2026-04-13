@@ -38,6 +38,8 @@ type App struct {
 	pageCacheMod int64
 	pageCacheAt  time.Time
 	pageCacheBuf []PageBlock
+
+	healthRescan func(context.Context) error
 }
 
 // NewApp constructs the bridge.

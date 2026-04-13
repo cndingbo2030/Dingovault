@@ -41,7 +41,11 @@
     "mobileNavSide": "Links & AI",
     "mobileNavGraph": "Graph",
     "mobileNavAbout": "About",
-    "aiOffline": "AI offline"
+    "aiOffline": "AI offline",
+    "healthReset": "Health: reset local index",
+    "healthResetConfirm": "Clear the local search database and rebuild from Markdown on disk? Your .md files will not be deleted.",
+    "healthResetDone": "Local index rebuilt from vault files.",
+    "fabAria": "Quick actions"
   },
   "palette": {
     "aria": "Command palette",

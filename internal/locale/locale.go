@@ -16,7 +16,9 @@ const (
 	ErrLocaleUnsupported  = "err.locale_unsupported"
 	ErrAIKeyRequired      = "err.ai_key_required"
 	ErrAIEmptyMessage     = "err.ai_empty_message"
-	ErrAIEmptyInstruction = "err.ai_empty_instruction"
+	ErrAIEmptyInstruction      = "err.ai_empty_instruction"
+	ErrHealthResetUnavailable  = "err.health_reset_unavailable"
+	ErrHealthResetCloud        = "err.health_reset_cloud"
 )
 
 // Normalize maps BCP 47 and legacy tags to supported UI locales.

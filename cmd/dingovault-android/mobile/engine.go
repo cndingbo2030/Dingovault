@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cndingbo2030/dingovault/internal/ai"
 	"github.com/cndingbo2030/dingovault/internal/bridge"
@@ -29,6 +30,7 @@ var (
 	app         *bridge.App
 	store       storage.Provider
 	idx         *scanner.Indexer
+	indexingBus *bus.Bus
 	watchStop   context.CancelFunc
 	initialized bool
 )
@@ -98,6 +100,7 @@ func Init(filesDir, externalFilesDir string) error {
 	}
 	_ = summarizer.Register(eventBus, store, engine, llm)
 	_ = embeddings.Register(eventBus, store, llm)
+	indexingBus = eventBus
 
 	app = bridge.NewApp(store, graphSvc, vaultPath)
 	app.Startup(context.Background())
@@ -107,6 +110,7 @@ func Init(filesDir, externalFilesDir string) error {
 
 	idx, err = scanner.NewIndexer(vaultPath, graphSvc)
 	if err != nil {
+		indexingBus = nil
 		_ = store.Close()
 		store = nil
 		app = nil
@@ -116,11 +120,26 @@ func Init(filesDir, externalFilesDir string) error {
 	if err := idx.FullScan(ctxScan); err != nil {
 		_ = idx.Close()
 		idx = nil
+		indexingBus = nil
 		_ = store.Close()
 		store = nil
 		app = nil
 		return err
 	}
+
+	app.SetHealthRescan(func(ctx context.Context) error { return idx.FullScan(ctx) })
+	go func() {
+		time.Sleep(800 * time.Millisecond)
+		ctx := tenant.WithUserID(context.Background(), tenant.LocalUserID)
+		c, err := config.Load()
+		if err != nil {
+			c = config.Default()
+		}
+		c.AI = config.NormalizeAISettings(c.AI)
+		if m := strings.TrimSpace(c.AI.EmbeddingsModel); m != "" && !c.AI.DisableEmbeddings && indexingBus != nil {
+			embeddings.ScheduleWarmMissing(ctx, store, indexingBus, m, 200)
+		}
+	}()
 
 	idx.SetOnFileChanged(func(path string) {
 		emitToSink("file-updated", map[string]any{"path": path})
@@ -152,6 +171,7 @@ func Shutdown() {
 		_ = idx.Close()
 		idx = nil
 	}
+	indexingBus = nil
 	if app != nil {
 		app.StopLANSyncAdvertise()
 		app = nil

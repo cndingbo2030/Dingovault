@@ -137,6 +137,8 @@ func dispatch(a *bridge.App, method string, args []json.RawMessage) (any, error)
 		return nil, a.InsertBlockAfter(id, t)
 	case "IsAIReachable":
 		return a.IsAIReachable(), nil
+	case "HealthResetLocalSearchIndex":
+		return nil, a.HealthResetLocalSearchIndex()
 	case "ReorderBlockBefore":
 		a1, err := strArg(args, 0)
 		if err != nil {

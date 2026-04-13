@@ -5,6 +5,10 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.content.Context
 import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -139,6 +143,30 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 splash.visibility = View.GONE
                 webView.visibility = View.VISIBLE
+            }
+        }
+
+        /** Light haptic for outline swipe actions (best-effort; no-op if vibrator missing). */
+        @SuppressLint("MissingPermission")
+        @JavascriptInterface
+        fun vibrateShort() {
+            runOnUiThread {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vm = getSystemService(VibratorManager::class.java) ?: return@runOnUiThread
+                        val v = vm.defaultVibrator
+                        if (!v.hasVibrator()) return@runOnUiThread
+                        v.vibrate(VibrationEffect.createOneShot(22, VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return@runOnUiThread
+                        @Suppress("DEPRECATION")
+                        if (!v.hasVibrator()) return@runOnUiThread
+                        @Suppress("DEPRECATION")
+                        v.vibrate(22)
+                    }
+                } catch (_: Exception) {
+                }
             }
         }
 

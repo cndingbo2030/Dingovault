@@ -15,7 +15,7 @@ func Install() {
 	if err != nil || home == "" {
 		return
 	}
-	dir := filepath.Join(home, "Library", "Logs")
+	dir := filepath.Join(home, "Library", "Logs", "Dingovault")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}

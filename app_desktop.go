@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"time"
 	"runtime/debug"
 	"strings"
 
@@ -50,11 +51,26 @@ func main() {
 	store := openDesktopStore(cfg)
 	defer closeProvider(store)
 
-	graphSvc := setupDesktopGraph(store, cfg)
+	graphSvc, eventBus := setupDesktopGraph(store, cfg)
 	idx := buildDesktopIndexer(notesPath, graphSvc, cfg.CloudMode)
 	defer func() { _ = idx.Close() }()
 
 	app := bridge.NewApp(store, graphSvc, notesPath)
+	app.SetHealthRescan(func(ctx context.Context) error { return idx.FullScan(ctx) })
+	if !cfg.CloudMode {
+		go func() {
+			time.Sleep(1 * time.Second)
+			ctx := tenant.WithUserID(context.Background(), tenant.LocalUserID)
+			c, err := config.Load()
+			if err != nil {
+				c = config.Default()
+			}
+			c.AI = config.NormalizeAISettings(c.AI)
+			if m := strings.TrimSpace(c.AI.EmbeddingsModel); m != "" && !c.AI.DisableEmbeddings {
+				embeddings.ScheduleWarmMissing(ctx, store, eventBus, m, 400)
+			}
+		}()
+	}
 	runDesktopApp(cfg, app, idx, notesPath)
 }
 
@@ -150,7 +166,7 @@ func closeProvider(store storage.Provider) {
 	}
 }
 
-func setupDesktopGraph(store storage.Provider, cfg config.Config) *graph.Service {
+func setupDesktopGraph(store storage.Provider, cfg config.Config) (*graph.Service, *bus.Bus) {
 	engine := parser.NewEngine()
 	graphSvc := graph.NewService(store, engine)
 	eventBus := bus.New()
@@ -165,7 +181,7 @@ func setupDesktopGraph(store storage.Provider, cfg config.Config) *graph.Service
 	}
 	_ = summarizer.Register(eventBus, store, engine, llm)
 	_ = embeddings.Register(eventBus, store, llm)
-	return graphSvc
+	return graphSvc, eventBus
 }
 
 func buildDesktopIndexer(notesPath string, graphSvc *graph.Service, cloudMode bool) *scanner.Indexer {

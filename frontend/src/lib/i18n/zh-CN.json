@@ -41,7 +41,11 @@
     "mobileNavSide": "链接与 AI",
     "mobileNavGraph": "图谱",
     "mobileNavAbout": "关于",
-    "aiOffline": "AI 离线"
+    "aiOffline": "AI 离线",
+    "healthReset": "健康检查：重置本地索引",
+    "healthResetConfirm": "清空本地搜索数据库并从磁盘上的 Markdown 重新建立索引？不会删除你的 .md 文件。",
+    "healthResetDone": "已根据仓库中的 Markdown 重建本地索引。",
+    "fabAria": "快捷操作"
   },
   "palette": {
     "aria": "命令面板",
