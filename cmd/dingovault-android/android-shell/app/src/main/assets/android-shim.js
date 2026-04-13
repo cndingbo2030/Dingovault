@@ -104,4 +104,36 @@
     LogError: function () {},
     LogFatal: function () {}
   };
+
+  // Long init: show a hint if the Go bridge has not completed first paint work yet.
+  window.__dingoFrontendReadyHooked = false;
+  window.__dingoMarkFrontendReady = function () {
+    window.__dingoFrontendReadyHooked = true;
+    if (window.__dingoInitHintTimer) clearTimeout(window.__dingoInitHintTimer);
+    var h = document.getElementById('dingo-init-hint');
+    if (h) h.remove();
+    try {
+      if (typeof AndroidBridge !== 'undefined' && AndroidBridge.notifyFrontendReady) {
+        AndroidBridge.notifyFrontendReady();
+      }
+    } catch (e) {}
+  };
+  function dingoShowInitHint() {
+    if (window.__dingoFrontendReadyHooked || window.__dingoInitHintShown) return;
+    window.__dingoInitHintShown = true;
+    if (!document.body) return;
+    var el = document.createElement('div');
+    el.id = 'dingo-init-hint';
+    el.setAttribute(
+      'style',
+      'position:fixed;left:12px;right:12px;bottom:max(24px,env(safe-area-inset-bottom));z-index:99999;' +
+        'text-align:center;font:15px/1.45 system-ui,-apple-system,sans-serif;color:rgba(232,232,236,0.92);' +
+        'background:rgba(18,18,22,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:12px 14px;pointer-events:none;'
+    );
+    el.textContent = 'Initializing database…';
+    document.body.appendChild(el);
+  }
+  window.__dingoInitHintTimer = setTimeout(function () {
+    if (!window.__dingoFrontendReadyHooked) dingoShowInitHint();
+  }, 8000);
 })();

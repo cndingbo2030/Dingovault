@@ -122,7 +122,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     override fun onPageFinished(view: WebView, url: String) {
-                        splash.visibility = View.GONE
+                        // Paint under the splash overlay; splash stays until Svelte calls notifyFrontendReady().
                         webView.visibility = View.VISIBLE
                     }
                 }
@@ -132,6 +132,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private inner class JsBridge {
+        /** Called from Svelte when the shell is interactive (dismisses native splash). */
+        @JavascriptInterface
+        fun notifyFrontendReady() {
+            runOnUiThread {
+                splash.visibility = View.GONE
+                webView.visibility = View.VISIBLE
+            }
+        }
+
         @JavascriptInterface
         fun call(method: String, argsJson: String, promiseId: String) {
             executor.execute {

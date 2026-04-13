@@ -44,7 +44,7 @@ Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikili
 **Details:** [CHANGELOG.md](CHANGELOG.md).
 
 - **Android CI:** stable **NDK / SDK env** (`ANDROID_HOME`, `NDK_HOME`, `ndk-bundle` symlink) and **gomobile init** ordering.
-- **Release assets:** descriptive names (**macOS-Apple-Silicon-M1-M2-M3**, **macOS-Intel-Processor**, **Windows-64bit-Installer**, **Linux-Desktop-amd64**, **Android-Mobile-Phone-Tablet**, etc.).
+- **Release assets:** descriptive names (**macOS-Apple-Silicon-M1-M2-M3**, **macOS-Intel-Processor**, **Windows-64bit-Installer**, **Linux-Desktop-amd64**, **Android-Universal-Install**, etc.).
 - **UI:** **safe-area** + **dynamic header** for tablet landscape vs phone.
 
 ## v1.4.0 — Android gomobile library & responsive UI

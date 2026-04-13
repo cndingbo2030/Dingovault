@@ -349,6 +349,10 @@
         return loadPage(pagePath)
       })
       .catch((e) => notifyErr(e))
+      .finally(() => {
+        const w = typeof window !== 'undefined' ? /** @type {any} */ (window) : null
+        if (w && typeof w.__dingoMarkFrontendReady === 'function') w.__dingoMarkFrontendReady()
+      })
 
     EventsOn('ai-inline-chunk', (/** @type {any} */ payload) => {
       window.dispatchEvent(new CustomEvent('dv-ai-chunk', { detail: payload }))
@@ -740,7 +744,7 @@
           <div class="about-logo">D</div>
         </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.4.3'}</p>
+        <p class="about-ver">{appVersion || 'v1.4.4'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>

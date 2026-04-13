@@ -33,4 +33,4 @@ cd cmd/dingovault-android/android-shell
 
 ## CI
 
-Release tags trigger `.github/workflows/release.yml`, which runs `gomobile bind` and Gradle **assembleRelease** / **bundleRelease**. The workflow pins **cmdline-tools**, exports **ANDROID_HOME** / **ANDROID_NDK_HOME** / **NDK_HOME**, symlinks **`ndk-bundle`** for gomobile, and uses semantic artifact names such as **`Dingovault-v1.4.x-Android-Mobile-Phone-Tablet.apk`** (see repo **`Makefile`** `RELEASE_*` / `make release-names`).
+Release tags trigger `.github/workflows/release.yml`, which runs `gomobile bind` and Gradle **assembleRelease** / **bundleRelease**. The workflow pins **cmdline-tools**, accepts **SDK licenses**, exports **ANDROID_HOME** / **ANDROID_NDK_HOME** / **NDK_HOME**, symlinks **`ndk-bundle`** for gomobile, and publishes **`Dingovault-v1.4.x-Android-Universal-Install.apk`** (see **`Makefile`** `RELEASE_*` / `make release-names`).

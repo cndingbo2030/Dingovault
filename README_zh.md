@@ -42,7 +42,7 @@ Dingovault 以 Markdown 块（block）为核心，提供 FTS5 全文搜索、双
 详见 **[CHANGELOG.md](CHANGELOG.md)**。
 
 - **Android CI：** 稳定的 **NDK/SDK 环境变量**、`ndk-bundle` 软链、**gomobile init** 顺序。
-- **发行包：** 文件名自解释（**Apple-Silicon-M1-M2-M3**、**Intel-Processor**、**Windows-64bit-Installer**、**Linux-Desktop-amd64**、**Android-Mobile-Phone-Tablet** 等）。
+- **发行包：** 文件名自解释（**Apple-Silicon-M1-M2-M3**、**Intel-Processor**、**Windows-64bit-Installer**、**Linux-Desktop-amd64**、**Android-Universal-Install** 等）。
 - **UI：** **安全区**与平板横屏 / 手机竖屏下的 **顶栏**适配。
 
 ## v1.4.0 — Android gomobile 与响应式界面

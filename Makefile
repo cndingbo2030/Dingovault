@@ -4,7 +4,7 @@
 
 REF ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-APP_VERSION ?= 1.4.3
+APP_VERSION ?= 1.4.4
 GO_LDFLAGS_X := -X github.com/cndingbo2030/dingovault/internal/version.String=$(APP_VERSION)
 DIST_ARCH ?= $(shell uname -m)
 
@@ -18,7 +18,7 @@ RELEASE_MAC_AS := Dingovault-$(REF)-macOS-Apple-Silicon-M1-M2-M3.zip
 RELEASE_MAC_SERVER_INTEL := Dingovault-$(REF)-macOS-Server-Intel-amd64
 RELEASE_MAC_SERVER_AS := Dingovault-$(REF)-macOS-Server-Apple-Silicon-arm64
 RELEASE_ANDROID_AAR := Dingovault-$(REF)-Android-Library-AAR.aar
-RELEASE_ANDROID_APK := Dingovault-$(REF)-Android-Mobile-Phone-Tablet.apk
+RELEASE_ANDROID_APK := Dingovault-$(REF)-Android-Universal-Install.apk
 RELEASE_ANDROID_AAB := Dingovault-$(REF)-Android-Play-Bundle.aab
 
 DIST_BUNDLE = dingovault-$(VERSION)-darwin-$(DIST_ARCH)

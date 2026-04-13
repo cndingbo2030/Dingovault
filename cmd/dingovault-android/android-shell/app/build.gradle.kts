@@ -59,16 +59,20 @@ android {
         applicationId = "com.dingovault.mobile"
         minSdk = 24
         targetSdk = 34
-        versionCode = 10403
+        versionCode = 10404
         versionName = dvVersionName
     }
 
     buildTypes {
         release {
+            // Beta: no R8/ProGuard — avoids stripping JNI glue from the gomobile AAR.
             isMinifyEnabled = false
+            isShrinkResources = false
+            // Debug keystore signs v1+v2 by default → installable sideload APK without Play App Signing.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
 
     buildFeatures {
         buildConfig = true
