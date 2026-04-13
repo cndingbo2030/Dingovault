@@ -199,7 +199,12 @@ jobs:
           wails build -platform darwin/${{ matrix.arch }} -o Dingovault -ldflags "${GO_LDFLAGS}"
       - name: Pack (semantic name)
         run: |
-          chmod +x build/bin/Dingovault.app/Contents/MacOS/Dingovault || true
+          APP="build/bin/Dingovault.app"
+          chmod +x "$APP/Contents/MacOS/Dingovault" || true
+          # CI zip sometimes strips +x on nested Mach-O helpers; restore execute on all bundle executables.
+          find "$APP" -path '*/Contents/MacOS/*' -type f -exec chmod +x {} + 2>/dev/null || true
+          find "$APP" -path '*/Contents/Helpers/*' -type f -exec chmod +x {} + 2>/dev/null || true
+          find "$APP" -path '*/Contents/Frameworks/*.app/Contents/MacOS/*' -type f -exec chmod +x {} + 2>/dev/null || true
           cd build/bin && zip -r "../../Dingovault-${{ github.ref_name }}-${{ matrix.zip_suffix }}.zip" Dingovault.app
       - uses: actions/upload-artifact@v4
         with:

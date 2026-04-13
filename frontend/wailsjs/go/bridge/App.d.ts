@@ -39,6 +39,8 @@ export function IndentBlock(arg1:string):Promise<void>;
 
 export function InsertBlockAfter(arg1:string,arg2:string):Promise<void>;
 
+export function IsAIReachable():Promise<boolean>;
+
 export function ListPagesByProperty(arg1:string,arg2:string):Promise<Array<string>>;
 
 export function ListVaultPages():Promise<Array<string>>;

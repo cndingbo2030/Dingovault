@@ -8,12 +8,15 @@ import (
 	"flag"
 	"log"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"strings"
 
 	"github.com/cndingbo2030/dingovault/internal/ai"
 	"github.com/cndingbo2030/dingovault/internal/bridge"
 	"github.com/cndingbo2030/dingovault/internal/bus"
 	"github.com/cndingbo2030/dingovault/internal/config"
+	"github.com/cndingbo2030/dingovault/internal/desktoplog"
 	"github.com/cndingbo2030/dingovault/internal/graph"
 	"github.com/cndingbo2030/dingovault/internal/onboarding"
 	"github.com/cndingbo2030/dingovault/internal/parser"
@@ -27,13 +30,21 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
+	desktoplog.Install()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("FATAL panic: %v\n%s", r, debug.Stack())
+			os.Exit(1)
+		}
+	}()
+
 	cfg := loadConfig()
 	notesPath := resolveDesktopNotesPath(cfg)
 	store := openDesktopStore(cfg)
@@ -92,6 +103,17 @@ func resolveDesktopNotesPath(cfg config.Config) string {
 	}
 	if notesPath == "" {
 		log.Fatal("set -notes to your vault directory (path is saved to config for next launch)")
+	}
+	if _, err := os.Stat(notesPath); err != nil {
+		if runtime.GOOS == "darwin" && notesPath != "" && os.IsNotExist(err) && os.Getenv("DINGO_NO_DEMO_VAULT") != "1" {
+			log.Printf("vault path %q missing (%v); using bundled Demo Vault (macOS recovery)", notesPath, err)
+			demoDir, derr := onboarding.EnsureDemoVaultFromFS(embeddedDemoVault, onboarding.DemoVaultRootName)
+			if derr != nil {
+				log.Fatalf("demo vault recovery: %v", derr)
+			}
+			notesPath = demoDir
+			log.Printf("recovery vault: %s (update vaultPath in config when your folder is available)", notesPath)
+		}
 	}
 	if _, err := os.Stat(notesPath); err != nil {
 		log.Fatalf("notes directory: %v", err)
@@ -181,12 +203,12 @@ func runDesktopApp(cfg config.Config, app *bridge.App, idx *scanner.Indexer, not
 		},
 		OnStartup: func(ctx context.Context) {
 			app.Startup(ctx)
-			runtime.WindowSetSize(ctx, cfg.Window.Width, cfg.Window.Height)
+			wailsruntime.WindowSetSize(ctx, cfg.Window.Width, cfg.Window.Height)
 			if cfg.Window.X != 0 || cfg.Window.Y != 0 {
-				runtime.WindowSetPosition(ctx, cfg.Window.X, cfg.Window.Y)
+				wailsruntime.WindowSetPosition(ctx, cfg.Window.X, cfg.Window.Y)
 			}
 			idx.SetOnFileChanged(func(path string) {
-				runtime.EventsEmit(ctx, "file-updated", map[string]string{"path": path})
+				wailsruntime.EventsEmit(ctx, "file-updated", map[string]string{"path": path})
 			})
 			go func() {
 				if werr := idx.WatchRecursive(watchCtx); werr != nil && werr != context.Canceled {
@@ -202,8 +224,8 @@ func runDesktopApp(cfg config.Config, app *bridge.App, idx *scanner.Indexer, not
 				fresh = cfg
 			}
 			fresh.VaultPath = notesPath
-			w, h := runtime.WindowGetSize(ctx)
-			x, y := runtime.WindowGetPosition(ctx)
+			w, h := wailsruntime.WindowGetSize(ctx)
+			x, y := wailsruntime.WindowGetPosition(ctx)
 			fresh.Window.Width = w
 			fresh.Window.Height = h
 			fresh.Window.X = x

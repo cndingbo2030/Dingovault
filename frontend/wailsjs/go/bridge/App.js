@@ -70,6 +70,10 @@ export function InsertBlockAfter(arg1, arg2) {
   return window['go']['bridge']['App']['InsertBlockAfter'](arg1, arg2);
 }
 
+export function IsAIReachable() {
+  return window['go']['bridge']['App']['IsAIReachable']();
+}
+
 export function ListPagesByProperty(arg1, arg2) {
   return window['go']['bridge']['App']['ListPagesByProperty'](arg1, arg2);
 }

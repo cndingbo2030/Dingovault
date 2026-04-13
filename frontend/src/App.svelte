@@ -33,7 +33,8 @@
     ReorderBlockBefore,
     GetAppVersion,
     GetLocale,
-    SetLocale
+    SetLocale,
+    IsAIReachable
   } from '../wailsjs/go/bridge/App.js'
   import { EventsOn } from '../wailsjs/runtime/runtime.js'
   import { locale, messages, tr, detectBrowserLocale, normalizeLocaleTag } from './lib/i18n/index.js'
@@ -82,6 +83,26 @@
   let navStack = []
   /** @type {'default' | 'phone-portrait' | 'phone-land' | 'tablet-land' | 'small-tablet'} */
   let chromeMode = 'default'
+
+  $: showMobileChrome =
+    chromeMode === 'phone-portrait' ||
+    chromeMode === 'phone-land' ||
+    chromeMode === 'small-tablet'
+
+  /** @type {boolean} */
+  let aiReachable = true
+
+  async function refreshAIReach() {
+    try {
+      aiReachable = await IsAIReachable()
+    } catch {
+      aiReachable = false
+    }
+  }
+
+  $: if (typeof window !== 'undefined' && sideTab === 'ai') {
+    void refreshAIReach()
+  }
 
   function syncChromeMode() {
     if (typeof window === 'undefined') return
@@ -346,6 +367,7 @@
     NotesRoot()
       .then((p) => {
         notesRoot = p
+        void refreshAIReach()
         return loadPage(pagePath)
       })
       .catch((e) => notifyErr(e))
@@ -382,7 +404,7 @@
       if (ae && ae.tagName === 'TEXTAREA' && ae.closest('.outliner-panel')) {
         return
       }
-      await loadPage(pagePath, { skipHistory: true })
+      await loadPage(pagePath, { skipHistory: true, softNav: true })
     })
 
     if (typeof window !== 'undefined') {
@@ -440,13 +462,14 @@
 
   /**
    * @param {string} rel
-   * @param {{ focusBlockId?: string, caretOffset?: number, skipHistory?: boolean, replaceTop?: boolean }} [opts]
+   * @param {{ focusBlockId?: string, caretOffset?: number, skipHistory?: boolean, replaceTop?: boolean, softNav?: boolean }} [opts]
    */
   async function loadPage(rel, opts) {
     const focusId = opts?.focusBlockId
     const caret = opts?.caretOffset
     const skipHist = opts?.skipHistory
     const replaceTop = opts?.replaceTop
+    const softNav = !!opts?.softNav && rel === pagePath && roots.length > 0
     if (!skipHist) {
       if (navStack.length === 0) {
         navStack = [rel]
@@ -457,7 +480,7 @@
       }
     }
     err = ''
-    pageLoading = true
+    if (!softNav) pageLoading = true
     try {
       roots = await GetPage(rel)
       pagePath = rel
@@ -669,6 +692,9 @@
     {#if lastFileEvent}
       <p class="event">{T('app.lastIndex')}: <code>{lastFileEvent}</code></p>
     {/if}
+    {#if !aiReachable}
+      <p class="ai-offline-pill" role="status">{T('app.aiOffline')}</p>
+    {/if}
   </header>
 
   <div class="toolbar">
@@ -686,15 +712,55 @@
     <button type="button" class="btn" on:click={() => loadPage(pagePath, { replaceTop: true })}
       >{T('app.open')}</button
     >
-    <button type="button" class="btn secondary" on:click={openOrCreate}>{T('app.ensurePage')}</button>
-    <button
-      type="button"
-      class="btn secondary"
-      on:click={toggleTheme}
-      title={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
-    >
-      {theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
-    </button>
+    {#if showMobileChrome}
+      <button
+        type="button"
+        class="btn secondary icon-btn"
+        on:click={openOrCreate}
+        aria-label={T('app.ensurePage')}
+        title={T('app.ensurePage')}
+      >
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"
+          ><path
+            fill="currentColor"
+            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM12 11H8v2h4v4h2v-4h4v-2h-4V7h-2v4z"
+          /></svg
+        >
+      </button>
+      <button
+        type="button"
+        class="btn secondary icon-btn"
+        on:click={toggleTheme}
+        aria-label={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+        title={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+      >
+        {#if theme === 'dark'}
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"
+            ><path
+              fill="currentColor"
+              d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5h2v3h-2V2zm0 19h2v3h-2v-3zM2 11h3v2H2v-2zm19 0h3v2h-3v-2zM4.22 4.22l2.12 2.12-1.41 1.41L2.81 5.64 4.22 4.22zm12.73 12.73 2.12 2.12-1.41 1.41-2.12-2.12 1.41-1.41zM19.78 4.22l-2.12 2.12-1.41-1.41 2.12-2.12 1.41 1.41zM7.05 18.95l-2.12 2.12-1.41-1.41 2.12-2.12 1.41 1.41z"
+            /></svg
+          >
+        {:else}
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"
+            ><path
+              fill="currentColor"
+              d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+            /></svg
+          >
+        {/if}
+      </button>
+    {:else}
+      <button type="button" class="btn secondary" on:click={openOrCreate}>{T('app.ensurePage')}</button>
+      <button
+        type="button"
+        class="btn secondary"
+        on:click={toggleTheme}
+        title={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+      >
+        {theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+      </button>
+    {/if}
     <span class="lang-toolbar" role="group" aria-label={T('app.langLabel')}>
       <button
         type="button"
@@ -707,8 +773,10 @@
         class:active={$locale === 'zh-CN'}
         on:click={() => setLanguage('zh-CN')}>{T('app.langZh')}</button>
     </span>
-    <button type="button" class="btn secondary" on:click={openGraph}>{T('app.graph')}</button>
-    <button type="button" class="btn secondary" on:click={openAbout}>{T('app.about')}</button>
+    {#if !showMobileChrome}
+      <button type="button" class="btn secondary" on:click={openGraph}>{T('app.graph')}</button>
+      <button type="button" class="btn secondary" on:click={openAbout}>{T('app.about')}</button>
+    {/if}
     {#each $toolbarEntries as p (p.id)}
       <button
         type="button"
@@ -744,7 +812,7 @@
           <div class="about-logo">D</div>
         </div>
         <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.4.4'}</p>
+        <p class="about-ver">{appVersion || 'v1.4.5'}</p>
         <p class="about-copy">
           {T('app.aboutBody')}
         </p>
@@ -905,26 +973,109 @@
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'outline'}
-    on:click={() => (mobilePanel = 'outline')}
+    class:active={mobilePanel === 'outline' && !graphOpen && !aboutOpen}
+    on:click={() => {
+      graphOpen = false
+      aboutOpen = false
+      mobilePanel = 'outline'
+    }}
   >
-    {T('app.mobileNavOutline')}
+    <span class="mobile-tab-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24"
+        ><path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z" /></svg
+      >
+    </span>
+    <span class="mobile-tab-lbl">{T('app.mobileNavOutline')}</span>
   </button>
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'related'}
-    on:click={() => (mobilePanel = 'related')}
+    class:active={mobilePanel === 'related' && !graphOpen && !aboutOpen}
+    on:click={() => {
+      graphOpen = false
+      aboutOpen = false
+      mobilePanel = 'related'
+    }}
   >
-    {T('app.mobileNavRelated')}
+    <span class="mobile-tab-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24"
+        ><path
+          fill="currentColor"
+          d="M12 2l3 6 6 .9-4.5 4.4L18 20l-6-3.2L6 20l1.5-6.7L3 8.9 9 8z"
+        /></svg
+      >
+    </span>
+    <span class="mobile-tab-lbl">{T('app.mobileNavRelated')}</span>
   </button>
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'side'}
-    on:click={() => (mobilePanel = 'side')}
+    class:active={mobilePanel === 'side' && !graphOpen && !aboutOpen}
+    on:click={() => {
+      graphOpen = false
+      aboutOpen = false
+      mobilePanel = 'side'
+    }}
   >
-    {T('app.mobileNavSide')}
+    <span class="mobile-tab-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24"
+        ><path
+          fill="currentColor"
+          d="M3.9 12c0-1.7 1.4-3.1 3.1-3.1h4V7H7c-2.8 0-5 2.2-5 5s2.2 5 5 5h4v-1.9H7c-1.7 0-3.1-1.4-3.1-3.1zm4.1 1h8v-2H8v2zm9-6h-4v2h4c1.7 0 3.1 1.4 3.1 3.1s-1.4 3.1-3.1 3.1h-4V14h4c2.8 0 5-2.2 5-5s-2.2-5-5-5z"
+        /></svg
+      >
+    </span>
+    <span class="mobile-tab-lbl">{T('app.mobileNavSide')}</span>
+  </button>
+  <button
+    type="button"
+    class="mobile-tab-btn mobile-tab-iconish"
+    class:active={graphOpen}
+    aria-label={T('app.mobileNavGraph')}
+    title={T('app.mobileNavGraph')}
+    on:click={() => {
+      aboutOpen = false
+      void openGraph()
+    }}
+  >
+    <span class="mobile-tab-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24"
+        ><circle cx="6" cy="6" r="2.5" fill="currentColor" /><circle cx="18" cy="8" r="2.5" fill="currentColor" /><circle
+          cx="9"
+          cy="18"
+          r="2.5"
+          fill="currentColor"
+        /><path
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          d="M8 7.5l8 1.5M10 17l6-6M6 8.5L9 16.5"
+        /></svg
+      >
+    </span>
+    <span class="mobile-tab-lbl">{T('app.mobileNavGraph')}</span>
+  </button>
+  <button
+    type="button"
+    class="mobile-tab-btn mobile-tab-iconish"
+    class:active={aboutOpen}
+    aria-label={T('app.mobileNavAbout')}
+    title={T('app.mobileNavAbout')}
+    on:click={() => {
+      graphOpen = false
+      void openAbout()
+    }}
+  >
+    <span class="mobile-tab-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24"
+        ><path
+          fill="currentColor"
+          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+        /></svg
+      >
+    </span>
+    <span class="mobile-tab-lbl">{T('app.mobileNavAbout')}</span>
   </button>
 </nav>
 
@@ -1072,6 +1223,9 @@
       max(56px, calc(12px + env(safe-area-inset-bottom, 0px))) max(16px, env(safe-area-inset-right, 0px));
     box-sizing: border-box;
   }
+  main[data-chrome-mode='tablet-land'].layout {
+    max-width: min(100%, 1440px);
+  }
   .top {
     padding-left: max(0px, env(safe-area-inset-left, 0px));
     padding-right: max(0px, env(safe-area-inset-right, 0px));
@@ -1140,44 +1294,65 @@
   }
 
   @media (min-width: 900px) {
-    .layout-grid {
+    main:not([data-chrome-mode='tablet-land']) .layout-grid {
       display: grid;
       grid-template-columns: minmax(200px, 24%) minmax(300px, 1fr) minmax(240px, 26%);
       gap: 16px;
       align-items: start;
     }
-    .layout-grid .col-related-wrap :global(.semantic-related) {
+    main:not([data-chrome-mode='tablet-land']) .layout-grid .col-related-wrap :global(.semantic-related) {
       margin-top: 0;
     }
-    .layout-grid .dv-sidebar {
+    main:not([data-chrome-mode='tablet-land']) .layout-grid .dv-sidebar {
       margin-top: 0;
     }
-    .layout-grid .col-main.outliner-panel {
+    main:not([data-chrome-mode='tablet-land']) .layout-grid .col-main.outliner-panel {
       margin-top: 0;
     }
+  }
+  main[data-chrome-mode='tablet-land'] .layout-grid {
+    display: grid;
+    grid-template-columns: minmax(260px, 32%) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  main[data-chrome-mode='tablet-land'] .layout-grid .dv-sidebar.col-side {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  main[data-chrome-mode='tablet-land'] .layout-grid .col-main.outliner-panel {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  main[data-chrome-mode='tablet-land'] .layout-grid .col-related-wrap {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  main[data-chrome-mode='tablet-land'] .layout-grid .col-related-wrap :global(.semantic-related) {
+    margin-top: 0;
   }
   .mobile-tabbar {
     display: none;
   }
-  @media (max-width: 599px) {
-    .layout {
+  @media (max-width: 899px) {
+    main.layout:not([data-chrome-mode='tablet-land']) {
       max-width: 100%;
       padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px))
         calc(12px + 56px + max(env(safe-area-inset-bottom, 0px), 12px)) max(12px, env(safe-area-inset-right, 0px));
     }
-    .layout-grid[data-mobile-panel='outline'] .col-related-wrap,
-    .layout-grid[data-mobile-panel='outline'] .col-side {
+    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='outline'] .col-related-wrap,
+    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='outline'] .col-side {
       display: none;
     }
-    .layout-grid[data-mobile-panel='related'] .col-main,
-    .layout-grid[data-mobile-panel='related'] .col-side {
+    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='related'] .col-main,
+    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='related'] .col-side {
       display: none;
     }
-    .layout-grid[data-mobile-panel='side'] .col-main,
-    .layout-grid[data-mobile-panel='side'] .col-related-wrap {
+    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='side'] .col-main,
+    main.layout:not([data-chrome-mode='tablet-land']) .layout-grid[data-mobile-panel='side'] .col-related-wrap {
       display: none;
     }
-    .mobile-tabbar {
+    main.layout:not([data-chrome-mode='tablet-land']) .mobile-tabbar {
       display: flex;
       position: fixed;
       z-index: 60;
@@ -1187,7 +1362,7 @@
       min-height: calc(48px + max(env(safe-area-inset-bottom, 0px), 8px));
       padding: 4px max(8px, env(safe-area-inset-left, 0px)) max(4px, max(env(safe-area-inset-bottom, 0px), 8px))
         max(8px, env(safe-area-inset-right, 0px));
-      gap: 6px;
+      gap: 12px;
       justify-content: stretch;
       align-items: stretch;
       border-top: 1px solid var(--dv-border);
@@ -1195,19 +1370,26 @@
       -webkit-backdrop-filter: blur(10px);
       backdrop-filter: blur(10px);
     }
-    .mobile-tab-btn {
+    main.layout:not([data-chrome-mode='tablet-land']) .mobile-tab-btn {
       flex: 1;
+      min-width: 0;
       min-height: 48px;
-      padding: 8px 6px;
+      padding: 6px 4px;
       border-radius: 10px;
       border: 1px solid var(--dv-border);
       background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
       color: inherit;
-      font-size: 0.78rem;
+      font-size: 0.68rem;
       font-weight: 600;
       touch-action: manipulation;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      line-height: 1.15;
     }
-    .mobile-tab-btn.active {
+    main.layout:not([data-chrome-mode='tablet-land']) .mobile-tab-btn.active {
       border-color: rgba(120, 160, 255, 0.45);
       background: rgba(80, 120, 255, 0.14);
     }
@@ -1272,10 +1454,45 @@
   }
   .toolbar {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     margin-top: 16px;
     flex-wrap: wrap;
     align-items: center;
+  }
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .icon-btn .ico {
+    width: 22px;
+    height: 22px;
+    display: block;
+  }
+  .ai-offline-pill {
+    display: inline-block;
+    margin: 8px 0 0;
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--dv-fg) 16%, transparent);
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+    opacity: 0.9;
+  }
+  .mobile-tab-ico svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+    opacity: 0.92;
+  }
+  .mobile-tab-lbl {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .path-input {
     flex: 1;
@@ -1322,7 +1539,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     margin-top: 12px;
     padding: 10px 12px;
     border-radius: 8px;
@@ -1339,8 +1556,8 @@
     min-height: 40px;
     font-size: 0.8rem;
   }
-  @media (max-width: 599px) {
-    .btn.sm {
+  @media (max-width: 899px) {
+    main.layout:not([data-chrome-mode='tablet-land']) .btn.sm {
       min-height: 48px;
     }
   }

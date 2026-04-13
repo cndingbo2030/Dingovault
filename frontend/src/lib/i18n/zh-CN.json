@@ -18,7 +18,7 @@
     "emptySubtitle": "从命令面板打开其他笔记，或在此页创建条目——每个列表项都是独立的大纲节点。",
     "emptyCta": "提示：",
     "emptyCtaBody": "按 Ctrl+K（macOS 为 ⌘K）可瞬间跳转。",
-    "hint": "Ctrl+K 命令面板 · Tab / Shift+Tab 缩进 · Cmd+Enter 待办循环 · / 命令 · 行尾 Enter 新增同级 · 拖动 ⠿ 排序 · ▾ 折叠 · 多选复选框 · 移动端：左滑 TODO · 右滑清除",
+    "hint": "Ctrl+K 命令面板 · Tab / Shift+Tab 缩进 · Cmd+Enter 待办循环 · / 命令 · 行尾 Enter 新增同级 · 拖动 ⠿ 排序 · ▾ 折叠 · 多选复选框 · 移动端：左滑删除 · 右滑 TODO",
     "aboutBody": "本地优先大纲工具：Markdown 块、全文检索与可选云端同步。详见仓库 README 的安装、SaaS 模式与安全说明。",
     "close": "关闭",
     "pageGraph": "页面图谱",
@@ -38,7 +38,10 @@
     "mobileNavAria": "移动端分区",
     "mobileNavOutline": "大纲",
     "mobileNavRelated": "相关",
-    "mobileNavSide": "链接与 AI"
+    "mobileNavSide": "链接与 AI",
+    "mobileNavGraph": "图谱",
+    "mobileNavAbout": "关于",
+    "aiOffline": "AI 离线"
   },
   "palette": {
     "aria": "命令面板",

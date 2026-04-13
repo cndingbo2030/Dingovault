@@ -40,9 +40,9 @@
   export let onToggleSelect = () => {}
   /** @type {(movingId: string, beforeId: string) => Promise<void>} */
   export let onReorderBefore = async () => {}
-  /** Mobile: swipe left on rail — cycle TODO */
+  /** Mobile: swipe right on rail — cycle TODO */
   export let onSwipeTodo = async () => {}
-  /** Mobile: swipe right on rail — clear block (confirm in parent) */
+  /** Mobile: swipe left on rail — delete / clear block (confirm in parent) */
   export let onSwipeClear = async () => {}
 
   let local = node.content
@@ -359,8 +359,8 @@
     const dy = e.changedTouches[0].clientY - swipeStartY
     const min = 52
     if (Math.abs(dx) < min || Math.abs(dx) < Math.abs(dy) * 1.2) return
-    if (dx < 0) await onSwipeTodo(node.id)
-    else await onSwipeClear(node.id)
+    if (dx < 0) await onSwipeClear(node.id)
+    else await onSwipeTodo(node.id)
   }
 
   /** @param {string} text */

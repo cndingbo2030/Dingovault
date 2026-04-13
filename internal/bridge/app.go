@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cndingbo2030/dingovault/internal/config"
 	"github.com/cndingbo2030/dingovault/internal/domain"
@@ -31,6 +32,12 @@ type App struct {
 
 	lanMu   sync.Mutex
 	stopLAN func()
+
+	pageMu       sync.Mutex
+	pageCacheAbs string
+	pageCacheMod int64
+	pageCacheAt  time.Time
+	pageCacheBuf []PageBlock
 }
 
 // NewApp constructs the bridge.
@@ -189,11 +196,37 @@ func (a *App) GetPage(path string) ([]PageBlock, error) {
 			}
 		}
 	}
+	var modNs int64
+	if st, err := os.Stat(abs); err == nil {
+		modNs = st.ModTime().UnixNano()
+	}
+	a.pageMu.Lock()
+	if a.pageCacheAbs == abs && a.pageCacheMod == modNs && len(a.pageCacheBuf) > 0 && time.Since(a.pageCacheAt) < 8*time.Second {
+		out := append([]PageBlock(nil), a.pageCacheBuf...)
+		a.pageMu.Unlock()
+		return out, nil
+	}
+	a.pageMu.Unlock()
+
 	blocks, err := a.store.ListDomainBlocksBySourcePath(ctx, abs)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", a.t(locale.ErrListBlocks), err)
 	}
-	return buildPageTree(blocks), nil
+	out := buildPageTree(blocks)
+	a.pageMu.Lock()
+	a.pageCacheAbs = abs
+	a.pageCacheMod = modNs
+	a.pageCacheBuf = append([]PageBlock(nil), out...)
+	a.pageCacheAt = time.Now()
+	a.pageMu.Unlock()
+	return out, nil
+}
+
+func (a *App) invalidatePageCache() {
+	a.pageMu.Lock()
+	a.pageCacheBuf = nil
+	a.pageCacheAbs = ""
+	a.pageMu.Unlock()
 }
 
 // UpdateBlock surgically replaces the block's line span in the backing file and re-indexes.
@@ -205,7 +238,11 @@ func (a *App) UpdateBlock(blockID, newContent string) error {
 	if a.ctx != nil {
 		ctx = a.ctx
 	}
-	return a.graph.UpdateBlock(ctx, blockID, newContent)
+	err := a.graph.UpdateBlock(ctx, blockID, newContent)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
 }
 
 // InsertBlockAfter appends a new Markdown line after the given block (Logseq-style Enter).
@@ -217,7 +254,11 @@ func (a *App) InsertBlockAfter(blockID, initialText string) error {
 	if a.ctx != nil {
 		ctx = a.ctx
 	}
-	return a.graph.InsertBlockAfter(ctx, blockID, initialText)
+	err := a.graph.InsertBlockAfter(ctx, blockID, initialText)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
 }
 
 // ReorderBlockBefore moves movingID immediately before beforeID among sibling blocks in the same file.
@@ -229,7 +270,11 @@ func (a *App) ReorderBlockBefore(movingID, beforeID string) error {
 	if a.ctx != nil {
 		ctx = a.ctx
 	}
-	return a.graph.ReorderSiblingBefore(ctx, movingID, beforeID)
+	err := a.graph.ReorderSiblingBefore(ctx, movingID, beforeID)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
 }
 
 // GetWikiGraph returns indexed pages as nodes and resolved wikilinks as directed edges.
@@ -278,7 +323,11 @@ func (a *App) IndentBlock(blockID string) error {
 	if a.ctx != nil {
 		ctx = a.ctx
 	}
-	return a.graph.IndentBlock(ctx, blockID)
+	err := a.graph.IndentBlock(ctx, blockID)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
 }
 
 // OutdentBlock decreases list indentation by two spaces for the same span.
@@ -290,7 +339,11 @@ func (a *App) OutdentBlock(blockID string) error {
 	if a.ctx != nil {
 		ctx = a.ctx
 	}
-	return a.graph.OutdentBlock(ctx, blockID)
+	err := a.graph.OutdentBlock(ctx, blockID)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
 }
 
 // CycleBlockTodo cycles TODO → DOING → DONE → (clear) on the first line of the block in the file.
@@ -302,7 +355,11 @@ func (a *App) CycleBlockTodo(blockID string) error {
 	if a.ctx != nil {
 		ctx = a.ctx
 	}
-	return a.graph.CycleBlockTodo(ctx, blockID)
+	err := a.graph.CycleBlockTodo(ctx, blockID)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
 }
 
 // ApplySlashOp applies a slash command to the block: today, todo, h1, h2, h3, code.
@@ -314,7 +371,11 @@ func (a *App) ApplySlashOp(blockID, op string) error {
 	if a.ctx != nil {
 		ctx = a.ctx
 	}
-	return a.graph.ApplySlashOp(ctx, blockID, op)
+	err := a.graph.ApplySlashOp(ctx, blockID, op)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
 }
 
 // EnsurePage creates path if missing (vault-relative or absolute under vault).
@@ -333,7 +394,11 @@ func (a *App) EnsurePage(path string) error {
 	if a.ctx != nil {
 		ctx = a.ctx
 	}
-	return a.graph.EnsurePage(ctx, abs)
+	err = a.graph.EnsurePage(ctx, abs)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
 }
 
 // ResolveWikilink returns the absolute .md path for a [[wikilink]] target string.

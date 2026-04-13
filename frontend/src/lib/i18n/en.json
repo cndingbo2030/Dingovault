@@ -18,7 +18,7 @@
     "emptySubtitle": "Open another note from the palette, or create blocks on this page — every bullet is a first-class outline node.",
     "emptyCta": "Tip:",
     "emptyCtaBody": "Press Ctrl+K (⌘K) to jump anywhere instantly.",
-    "hint": "Ctrl+K palette · Tab / Shift+Tab indent · Cmd+Enter TODO cycle · / commands · Enter at end adds sibling · drag ⠿ to reorder · fold ▾ · checkboxes multi-select · mobile: swipe ← TODO · → clear",
+    "hint": "Ctrl+K palette · Tab / Shift+Tab indent · Cmd+Enter TODO cycle · / commands · Enter at end adds sibling · drag ⠿ to reorder · fold ▾ · checkboxes multi-select · mobile: swipe ← delete · → TODO",
     "aboutBody": "Local-first outliner with Markdown blocks, FTS search, and optional cloud sync. See the repository README for setup, SaaS mode, and security notes.",
     "close": "Close",
     "pageGraph": "Page graph",
@@ -38,7 +38,10 @@
     "mobileNavAria": "Mobile section",
     "mobileNavOutline": "Outline",
     "mobileNavRelated": "Related",
-    "mobileNavSide": "Links & AI"
+    "mobileNavSide": "Links & AI",
+    "mobileNavGraph": "Graph",
+    "mobileNavAbout": "About",
+    "aiOffline": "AI offline"
   },
   "palette": {
     "aria": "Command palette",

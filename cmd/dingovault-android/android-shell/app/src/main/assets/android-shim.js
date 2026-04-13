@@ -54,6 +54,7 @@
     'GetWikiGraph',
     'IndentBlock',
     'InsertBlockAfter',
+    'IsAIReachable',
     'ListLANSyncPeers',
     'ListPagesByProperty',
     'ListVaultPages',
