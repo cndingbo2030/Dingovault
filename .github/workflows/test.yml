@@ -29,7 +29,4 @@ jobs:
         run: go vet ./...
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: v1.64.8
-          install-mode: goinstall
+        run: go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8 run
