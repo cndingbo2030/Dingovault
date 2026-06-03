@@ -49,7 +49,8 @@ func (a *App) RunVaultCommand(command string) (ConsoleCommandResult, error) {
 	defer cancel()
 
 	start := time.Now()
-	cmd := exec.CommandContext(ctx, "/bin/zsh", "-lc", command)
+	shell, args := consoleShell(command)
+	cmd := exec.CommandContext(ctx, shell, args...)
 	cmd.Dir = absCwd
 	cmd.Env = consoleEnv()
 
@@ -102,4 +103,23 @@ func consoleEnv() []string {
 	env = append(env, "PATH="+strings.Join(parts, ":"))
 	env = append(env, "DINGOVAULT_CONSOLE=1")
 	return env
+}
+
+func consoleShell(command string) (string, []string) {
+	for _, shell := range []string{os.Getenv("SHELL"), "/bin/zsh", "/bin/bash", "/bin/sh", "sh"} {
+		shell = strings.TrimSpace(shell)
+		if shell == "" {
+			continue
+		}
+		if shell != "sh" {
+			if st, err := os.Stat(shell); err != nil || st.IsDir() {
+				continue
+			}
+		}
+		if filepath.Base(shell) == "sh" {
+			return shell, []string{"-c", command}
+		}
+		return shell, []string{"-lc", command}
+	}
+	return "sh", []string{"-c", command}
 }
