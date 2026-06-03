@@ -89,7 +89,7 @@ jobs:
           if npm publish > npm-publish.log 2>&1; then
             exit 0
           fi
-          if grep -q '409 Conflict' npm-publish.log && grep -q 'existing version' npm-publish.log; then
+          if grep -qiE '409 Conflict|existing version|previously published versions|cannot publish over' npm-publish.log; then
             echo "npm: version already published — skipping"
             exit 0
           fi
