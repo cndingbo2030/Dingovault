@@ -3,6 +3,8 @@ import { writable } from 'svelte/store'
 /**
  * @typedef {{ id?: string, label: string, run?: () => void | Promise<void> }} ToolbarSpec
  * @typedef {{ id?: string, title: string, body: string }} SidebarSpec
+ * @typedef {{ version: string, registerToolbarButton: typeof registerToolbarButton, registerSidebarSection: typeof registerSidebarSection }} DingoPluginAPI
+ * @typedef {Window & typeof globalThis & { __DINGOVAULT__?: DingoPluginAPI }} DingoWindow
  */
 
 /** @type {import('svelte/store').Writable<ToolbarSpec[]>} */
@@ -12,12 +14,14 @@ export const toolbarEntries = writable([])
 export const sidebarEntries = writable([])
 
 /** Register a toolbar button (e.g. from a plugin script). `run` is called on tap. */
+/** @param {ToolbarSpec} spec */
 export function registerToolbarButton(spec) {
   const id = spec.id || `tb-${Date.now()}`
   toolbarEntries.update((a) => [...a, { ...spec, id }])
 }
 
 /** Register a sidebar section (plain-text body; avoid HTML from untrusted plugins). */
+/** @param {SidebarSpec} spec */
 export function registerSidebarSection(spec) {
   const id = spec.id || `sb-${Date.now()}`
   sidebarEntries.update((a) => [...a, { ...spec, id }])
@@ -53,9 +57,10 @@ export function initImageFallback() {
 /** Expose a stable global for third-party scripts loaded after the app shell. */
 export function exposePluginAPI() {
   if (typeof window === 'undefined') return
-  window.__DINGOVAULT__ = {
-    version: '1.4.4',
+  const w = /** @type {DingoWindow} */ (window)
+  w.__DINGOVAULT__ = {
+    version: '1.5.0',
     registerToolbarButton,
-    registerSidebarSection,
+    registerSidebarSection
   }
 }

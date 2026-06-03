@@ -1,5 +1,5 @@
 export namespace bridge {
-	
+
 	export class AISettingsDTO {
 	    provider: string;
 	    model: string;
@@ -10,11 +10,11 @@ export namespace bridge {
 	    disableEmbeddings: boolean;
 	    systemPrompt: string;
 	    semanticTopK: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new AISettingsDTO(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = source["provider"];
@@ -28,6 +28,48 @@ export namespace bridge {
 	        this.semanticTopK = source["semanticTopK"];
 	    }
 	}
+	export class ConsoleCommandResult {
+	    command: string;
+	    cwd: string;
+	    output: string;
+	    exitCode: number;
+	    durationMs: number;
+	    timedOut: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new ConsoleCommandResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.command = source["command"];
+	        this.cwd = source["cwd"];
+	        this.output = source["output"];
+	        this.exitCode = source["exitCode"];
+	        this.durationMs = source["durationMs"];
+	        this.timedOut = source["timedOut"];
+	    }
+	}
+	export class LANPeerDTO {
+	    name: string;
+	    host: string;
+	    ip: string;
+	    port: number;
+	    txt?: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new LANPeerDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.host = source["host"];
+	        this.ip = source["ip"];
+	        this.port = source["port"];
+	        this.txt = source["txt"];
+	    }
+	}
 	export class PageBlock {
 	    id: string;
 	    parentId: string;
@@ -35,11 +77,11 @@ export namespace bridge {
 	    properties?: Record<string, string>;
 	    metadata: domain.BlockMetadata;
 	    children: PageBlock[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new PageBlock(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -49,7 +91,7 @@ export namespace bridge {
 	        this.metadata = this.convertValues(source["metadata"], domain.BlockMetadata);
 	        this.children = this.convertValues(source["children"], PageBlock);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -74,11 +116,11 @@ export namespace bridge {
 	    relPath: string;
 	    preview: string;
 	    score: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SemanticRelatedDTO(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.blockId = source["blockId"];
@@ -101,11 +143,11 @@ export namespace bridge {
 	    s3AccessKey: string;
 	    s3SecretKey: string;
 	    s3Endpoint: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new SyncSettingsDTO(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.webdavUrl = source["webdavUrl"];
@@ -122,31 +164,33 @@ export namespace bridge {
 	        this.s3Endpoint = source["s3Endpoint"];
 	    }
 	}
-	export class LANPeerDTO {
+	export class VaultFileDTO {
+	    path: string;
 	    name: string;
-	    host: string;
-	    ip: string;
-	    port: number;
-	    txt?: string[];
-	
+	    ext: string;
+	    kind: string;
+	    size: number;
+	    modifiedUnix: number;
+
 	    static createFrom(source: any = {}) {
-	        return new LANPeerDTO(source);
+	        return new VaultFileDTO(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
 	        this.name = source["name"];
-	        this.host = source["host"];
-	        this.ip = source["ip"];
-	        this.port = source["port"];
-	        this.txt = source["txt"];
+	        this.ext = source["ext"];
+	        this.kind = source["kind"];
+	        this.size = source["size"];
+	        this.modifiedUnix = source["modifiedUnix"];
 	    }
 	}
 
 }
 
 export namespace domain {
-	
+
 	export class BlockMetadata {
 	    sourcePath: string;
 	    lineStart: number;
@@ -156,11 +200,11 @@ export namespace domain {
 	    createdAt: any;
 	    // Go type: time
 	    updatedAt: any;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new BlockMetadata(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourcePath = source["sourcePath"];
@@ -170,7 +214,7 @@ export namespace domain {
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.updatedAt = this.convertValues(source["updatedAt"], null);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -195,11 +239,11 @@ export namespace domain {
 	    content: string;
 	    properties?: Record<string, string>;
 	    metadata: BlockMetadata;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Block(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -208,7 +252,7 @@ export namespace domain {
 	        this.properties = source["properties"];
 	        this.metadata = this.convertValues(source["metadata"], BlockMetadata);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -231,7 +275,7 @@ export namespace domain {
 }
 
 export namespace storage {
-	
+
 	export class BlockSearchHit {
 	    id: string;
 	    sourcePath: string;
@@ -241,11 +285,11 @@ export namespace storage {
 	    outlineLevel: number;
 	    snippet: string;
 	    rank: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new BlockSearchHit(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -261,11 +305,11 @@ export namespace storage {
 	export class WikiGraphEdge {
 	    source: string;
 	    target: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new WikiGraphEdge(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.source = source["source"];
@@ -275,11 +319,11 @@ export namespace storage {
 	export class WikiGraphNode {
 	    id: string;
 	    label: string;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new WikiGraphNode(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -289,17 +333,17 @@ export namespace storage {
 	export class WikiGraph {
 	    nodes: WikiGraphNode[];
 	    edges: WikiGraphEdge[];
-	
+
 	    static createFrom(source: any = {}) {
 	        return new WikiGraph(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.nodes = this.convertValues(source["nodes"], WikiGraphNode);
 	        this.edges = this.convertValues(source["edges"], WikiGraphEdge);
 	    }
-	
+
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -318,17 +362,17 @@ export namespace storage {
 		    return a;
 		}
 	}
-	
-	
+
+
 	export class WikiGraphSemanticEdge {
 	    source: string;
 	    target: string;
 	    score: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new WikiGraphSemanticEdge(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.source = source["source"];

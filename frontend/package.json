@@ -1,7 +1,7 @@
 {
   "name": "dingovault-frontend",
   "private": true,
-  "version": "1.4.6",
+  "version": "1.5.0",
   "license": "AGPL-3.0",
   "type": "module",
   "author": "cndingbo2030 <cndingbo@outlook.com>",

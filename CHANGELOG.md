@@ -2,6 +2,44 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
+## v1.5.0 — Obsidian-grade desktop workspace, graph, AI, and files (2026-06-03)
+
+### Desktop workspace
+
+- Reworked the Wails desktop shell into a tighter Obsidian/JetBrains-style workspace:
+  - native-feeling macOS titlebar integration,
+  - compact activity rail,
+  - dedicated files pane,
+  - tab-like current document header,
+  - collapsible right inspector,
+  - separate settings window,
+  - bottom workspace console.
+- Added a full vault file browser that can list Markdown plus supported Office/WPS, PDF, image, and CAD/DWG-style files. Markdown opens in the editor; non-Markdown files are safely handed to the operating system default app.
+- Added a new-note flow from the files pane and cleaned up recent/current-file highlighting so the UI no longer looks like two files are selected at once.
+
+### Graph view
+
+- Rebuilt the page graph around an Obsidian-like interaction model:
+  - mouse wheel zoom,
+  - canvas panning,
+  - node dragging,
+  - reset and zoom controls,
+  - hover-aware link emphasis,
+  - denser label rules for larger vaults.
+- Improved wiki graph extraction so duplicate page labels are merged and resolved paths are cleaner for page-level visualization.
+
+### Editor and AI panels
+
+- Calmed the editor visual language: lower-noise focus rings, clearer wikilink chips, and tag suggestions that appear only while editing instead of cluttering reading mode.
+- Added stale block recovery: when the index changes and a block id is no longer present, the document refreshes instead of showing a raw `lookup block: block not found` error across the page.
+- Refined backlinks, semantically related content, and AI Chat side panels with cleaner density, empty states, and settings.
+
+### Developer and release readiness
+
+- Added focused tests for desktop database path resolution, vault file handling, console commands, and wiki graph generation.
+- Built and installed a local macOS Wails app during validation.
+- Versioned the desktop, frontend, Android shell, and documentation as `1.5.0`.
+
 ## v1.4.2 — AGPL-3.0, GHCR, GitHub Packages npm (2026-04-10)
 
 - **License:** project is **AGPL-3.0** (root `LICENSE`).

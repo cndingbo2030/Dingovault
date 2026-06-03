@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +43,16 @@ type App struct {
 	pageCacheBuf []PageBlock
 
 	healthRescan func(context.Context) error
+}
+
+// VaultFileDTO is a vault-relative file entry exposed to the desktop UI.
+type VaultFileDTO struct {
+	Path         string `json:"path"`
+	Name         string `json:"name"`
+	Ext          string `json:"ext"`
+	Kind         string `json:"kind"`
+	Size         int64  `json:"size"`
+	ModifiedUnix int64  `json:"modifiedUnix"`
 }
 
 // NewApp constructs the bridge.
@@ -162,6 +175,135 @@ func (a *App) ListVaultPages() ([]string, error) {
 		out = append(out, rel)
 	}
 	return out, nil
+}
+
+// ListVaultFiles returns supported user files in the vault, including Markdown,
+// Office/WPS documents, PDF, images, and CAD drawings.
+func (a *App) ListVaultFiles() ([]VaultFileDTO, error) {
+	if strings.TrimSpace(a.notesRoot) == "" {
+		return nil, fmt.Errorf("%s", a.t(locale.ErrNotesRootNotSet))
+	}
+	root := a.NotesRoot()
+	var out []VaultFileDTO
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		name := d.Name()
+		if d.IsDir() {
+			if path != root && shouldSkipVaultFileDir(name) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasPrefix(name, ".") {
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		kind := vaultFileKind(ext)
+		if kind == "" {
+			return nil
+		}
+		rel, err := graph.VaultRelativePath(root, path)
+		if err != nil {
+			return nil
+		}
+		var size int64
+		var modified int64
+		if info, statErr := d.Info(); statErr == nil {
+			size = info.Size()
+			modified = info.ModTime().Unix()
+		}
+		out = append(out, VaultFileDTO{
+			Path:         rel,
+			Name:         name,
+			Ext:          strings.TrimPrefix(ext, "."),
+			Kind:         kind,
+			Size:         size,
+			ModifiedUnix: modified,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Kind != out[j].Kind {
+			return vaultFileKindRank(out[i].Kind) < vaultFileKindRank(out[j].Kind)
+		}
+		return strings.ToLower(out[i].Path) < strings.ToLower(out[j].Path)
+	})
+	return out, nil
+}
+
+// OpenVaultFile opens a non-Markdown vault file with the operating system's default app.
+func (a *App) OpenVaultFile(path string) error {
+	if strings.TrimSpace(a.notesRoot) == "" {
+		return fmt.Errorf("%s", a.t(locale.ErrNotesRootNotSet))
+	}
+	abs, err := graph.ResolveVaultPath(a.notesRoot, path)
+	if err != nil {
+		return fmt.Errorf("%s: %w", a.t(locale.ErrResolvePath), err)
+	}
+	st, err := os.Stat(abs)
+	if err != nil {
+		return err
+	}
+	if st.IsDir() {
+		return fmt.Errorf("cannot open directory")
+	}
+	if vaultFileKind(filepath.Ext(abs)) == "" {
+		return fmt.Errorf("unsupported file type")
+	}
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", abs)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", "", abs)
+	default:
+		cmd = exec.Command("xdg-open", abs)
+	}
+	return cmd.Start()
+}
+
+func shouldSkipVaultFileDir(name string) bool {
+	n := strings.ToLower(strings.TrimSpace(name))
+	return n == "" || strings.HasPrefix(n, ".") || n == "node_modules" || n == "vendor"
+}
+
+func vaultFileKind(ext string) string {
+	switch strings.ToLower(strings.TrimPrefix(ext, ".")) {
+	case "md", "markdown":
+		return "markdown"
+	case "doc", "docx", "xls", "xlsx", "ppt", "pptx", "wps", "et", "dps":
+		return "office"
+	case "pdf":
+		return "pdf"
+	case "png", "jpg", "jpeg", "gif", "webp", "svg":
+		return "image"
+	case "dwg", "dxf":
+		return "cad"
+	default:
+		return ""
+	}
+}
+
+func vaultFileKindRank(kind string) int {
+	switch kind {
+	case "markdown":
+		return 0
+	case "office":
+		return 1
+	case "pdf":
+		return 2
+	case "image":
+		return 3
+	case "cad":
+		return 4
+	default:
+		return 9
+	}
 }
 
 // NotesRoot returns the configured vault directory (absolute path).

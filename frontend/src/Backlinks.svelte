@@ -108,24 +108,21 @@
 
 <style>
   .backlinks {
-    margin-top: 28px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: 0;
+    padding: 0;
   }
   .title {
-    margin: 0 0 12px;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    opacity: 0.55;
+    margin: 0 0 8px;
+    font-size: 0.76rem;
+    letter-spacing: 0;
+    opacity: 0.62;
     font-weight: 600;
   }
   .muted {
     margin: 0;
-    font-size: 0.88rem;
-    opacity: 0.5;
+    font-size: 0.8rem;
+    opacity: 0.56;
+    line-height: 1.45;
   }
   .bl-empty {
     text-align: center;
@@ -157,34 +154,42 @@
     padding: 0;
   }
   .row + .row {
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid color-mix(in srgb, var(--dv-fg) 7%, transparent);
   }
   .link {
     display: block;
     width: 100%;
     text-align: left;
-    padding: 10px 4px;
+    padding: 8px 10px;
     margin: 0;
-    border: none;
+    border: 1px solid transparent;
     background: transparent;
     color: inherit;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 5px;
   }
   .link:hover {
-    background: rgba(255, 255, 255, 0.04);
+    border-color: color-mix(in srgb, var(--dv-accent) 20%, transparent);
+    background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
   }
   .path {
     display: block;
-    font-size: 0.72rem;
-    opacity: 0.55;
-    word-break: break-all;
+    color: color-mix(in srgb, var(--dv-accent) 72%, var(--dv-fg));
+    font-size: 0.78rem;
+    font-weight: 520;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     margin-bottom: 4px;
   }
   .snippet {
-    display: block;
-    font-size: 0.88rem;
-    line-height: 1.45;
-    opacity: 0.92;
+    display: -webkit-box;
+    color: color-mix(in srgb, var(--dv-fg) 76%, var(--dv-muted));
+    font-size: 0.78rem;
+    line-height: 1.42;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 </style>

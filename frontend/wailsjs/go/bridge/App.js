@@ -34,10 +34,6 @@ export function GetBacklinks(arg1) {
   return window['go']['bridge']['App']['GetBacklinks'](arg1);
 }
 
-export function HealthResetLocalSearchIndex() {
-  return window['go']['bridge']['App']['HealthResetLocalSearchIndex']();
-}
-
 export function GetLocale() {
   return window['go']['bridge']['App']['GetLocale']();
 }
@@ -66,6 +62,10 @@ export function GetWikiGraph() {
   return window['go']['bridge']['App']['GetWikiGraph']();
 }
 
+export function HealthResetLocalSearchIndex() {
+  return window['go']['bridge']['App']['HealthResetLocalSearchIndex']();
+}
+
 export function IndentBlock(arg1) {
   return window['go']['bridge']['App']['IndentBlock'](arg1);
 }
@@ -78,20 +78,28 @@ export function IsAIReachable() {
   return window['go']['bridge']['App']['IsAIReachable']();
 }
 
+export function ListLANSyncPeers() {
+  return window['go']['bridge']['App']['ListLANSyncPeers']();
+}
+
 export function ListPagesByProperty(arg1, arg2) {
   return window['go']['bridge']['App']['ListPagesByProperty'](arg1, arg2);
+}
+
+export function ListVaultFiles() {
+  return window['go']['bridge']['App']['ListVaultFiles']();
 }
 
 export function ListVaultPages() {
   return window['go']['bridge']['App']['ListVaultPages']();
 }
 
-export function ListLANSyncPeers() {
-  return window['go']['bridge']['App']['ListLANSyncPeers']();
-}
-
 export function NotesRoot() {
   return window['go']['bridge']['App']['NotesRoot']();
+}
+
+export function OpenVaultFile(arg1) {
+  return window['go']['bridge']['App']['OpenVaultFile'](arg1);
 }
 
 export function OutdentBlock(arg1) {
@@ -114,12 +122,20 @@ export function ResolveWikilink(arg1) {
   return window['go']['bridge']['App']['ResolveWikilink'](arg1);
 }
 
+export function RunVaultCommand(arg1) {
+  return window['go']['bridge']['App']['RunVaultCommand'](arg1);
+}
+
 export function SearchBlocks(arg1) {
   return window['go']['bridge']['App']['SearchBlocks'](arg1);
 }
 
 export function SetAISettings(arg1) {
   return window['go']['bridge']['App']['SetAISettings'](arg1);
+}
+
+export function SetHealthRescan(arg1) {
+  return window['go']['bridge']['App']['SetHealthRescan'](arg1);
 }
 
 export function SetLocale(arg1) {
@@ -142,24 +158,24 @@ export function StartLANSyncAdvertise() {
   return window['go']['bridge']['App']['StartLANSyncAdvertise']();
 }
 
-export function StopLANSyncAdvertise() {
-  return window['go']['bridge']['App']['StopLANSyncAdvertise']();
-}
-
 export function Startup(arg1) {
   return window['go']['bridge']['App']['Startup'](arg1);
+}
+
+export function StopLANSyncAdvertise() {
+  return window['go']['bridge']['App']['StopLANSyncAdvertise']();
 }
 
 export function SuggestTagsForBlock(arg1) {
   return window['go']['bridge']['App']['SuggestTagsForBlock'](arg1);
 }
 
-export function SyncVaultWebDAV() {
-  return window['go']['bridge']['App']['SyncVaultWebDAV']();
-}
-
 export function SyncVaultS3() {
   return window['go']['bridge']['App']['SyncVaultS3']();
+}
+
+export function SyncVaultWebDAV() {
+  return window['go']['bridge']['App']['SyncVaultWebDAV']();
 }
 
 export function UpdateBlock(arg1, arg2) {

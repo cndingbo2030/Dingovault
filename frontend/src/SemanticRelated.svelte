@@ -14,7 +14,7 @@
   /** @param {string} rel */
   export let onOpenPage = async (rel) => {}
 
-  /** @type {{ blockId: string, relPath: string, preview: string, score: number }[]} */
+  /** @type {{ blockId: string, relPath?: string, sourcePath?: string, preview: string, score: number }[]} */
   let items = []
   let loading = false
   let seq = 0
@@ -36,6 +36,18 @@
     } finally {
       if (my === seq) loading = false
     }
+  }
+
+  /** @param {string} p */
+  function pageLabel(p) {
+    const s = String(p || '').split(/[/\\]/).pop() || p
+    return s.replace(/\.md$/i, '')
+  }
+
+  /** @param {number | undefined} score */
+  function scoreLabel(score) {
+    if (score == null || Number.isNaN(score)) return ''
+    return `${Math.round(score * 100)}%`
   }
 
   let prevPath = ''
@@ -60,12 +72,17 @@
   {:else}
     <ul class="hits">
       {#each items as h (h.blockId + h.relPath)}
+        {@const targetPath = h.relPath || h.sourcePath || ''}
         <li>
-          <button type="button" class="hit" on:click={() => onOpenPage(h.relPath || h.sourcePath || '')}>
-            <span class="path">{h.relPath || h.sourcePath}</span>
-            <span class="score">{h.score != null ? h.score.toFixed(2) : ''}</span>
+          <button type="button" class="hit" disabled={!targetPath} on:click={() => onOpenPage(targetPath)}>
+            <span class="hit-head">
+              <span class="path" title={targetPath}>{pageLabel(targetPath)}</span>
+              {#if scoreLabel(h.score)}
+                <span class="score">{scoreLabel(h.score)}</span>
+              {/if}
+            </span>
+            <span class="preview">{h.preview}</span>
           </button>
-          <p class="preview">{h.preview}</p>
         </li>
       {/each}
     </ul>
@@ -74,23 +91,21 @@
 
 <style>
   .semantic-related {
-    margin-top: 20px;
-    padding: 14px 16px;
-    border-radius: 10px;
-    border: 1px solid var(--dv-border, rgba(255, 255, 255, 0.12));
-    background: color-mix(in srgb, var(--dv-fg) 4%, transparent);
+    margin-top: 0;
+    padding: 0;
   }
   .title {
-    margin: 0 0 10px;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    opacity: 0.55;
+    margin: 0 0 8px;
+    font-size: 0.76rem;
+    letter-spacing: 0;
+    opacity: 0.62;
+    font-weight: 600;
   }
   .muted {
     margin: 0;
-    font-size: 0.85rem;
-    opacity: 0.55;
+    font-size: 0.8rem;
+    opacity: 0.56;
+    line-height: 1.45;
   }
   .hits {
     list-style: none;
@@ -98,43 +113,65 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 3px;
   }
   .hit {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
+    display: block;
     width: 100%;
     text-align: left;
-    min-height: 48px;
-    padding: 10px 10px;
+    min-height: 0;
+    padding: 8px 10px;
     margin: 0;
-    border: none;
-    border-radius: 6px;
-    background: rgba(120, 160, 255, 0.08);
-    color: #b4c8ff;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: inherit;
     cursor: pointer;
     font: inherit;
     touch-action: manipulation;
   }
   .hit:hover {
-    background: rgba(120, 160, 255, 0.16);
+    border-color: color-mix(in srgb, var(--dv-accent) 20%, transparent);
+    background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+  }
+  .hit:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+  .hit-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
   }
   .path {
-    font-size: 0.82rem;
-    word-break: break-all;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: color-mix(in srgb, var(--dv-accent) 76%, var(--dv-fg));
+    font-size: 0.8rem;
+    font-weight: 520;
   }
   .score {
-    font-size: 0.72rem;
-    opacity: 0.55;
-    font-family: var(--dv-font-mono, ui-monospace, monospace);
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+    color: var(--dv-muted);
+    font-size: 0.66rem;
+    font-family: var(--dv-font, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif);
     flex-shrink: 0;
   }
   .preview {
-    margin: 4px 0 0;
-    font-size: 0.8rem;
-    opacity: 0.72;
-    line-height: 1.45;
+    display: -webkit-box;
+    margin: 5px 0 0;
+    color: color-mix(in srgb, var(--dv-fg) 72%, var(--dv-muted));
+    font-size: 0.78rem;
+    line-height: 1.42;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 </style>

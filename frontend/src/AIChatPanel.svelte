@@ -133,10 +133,21 @@
 </script>
 
 <section class="ai-chat" aria-label={T('aiChat.aria')}>
-  <h2 class="title">{T('aiChat.title')}</h2>
-  <p class="ctx">{T('aiChat.ragHint', { path: pagePath || '—' })}</p>
+  <div class="ai-head">
+    <div class="ai-head-copy">
+      <h2 class="title">{T('aiChat.title')}</h2>
+      <p class="ctx">{T('aiChat.ragHint', { path: pagePath || '—' })}</p>
+    </div>
+    <span class="ai-mode">{provider || 'local'}</span>
+  </div>
 
   <div class="thread" role="log" aria-live="polite">
+    {#if !thread.length && !busy}
+      <div class="ai-empty">
+        <p class="empty-title">{T('aiChat.emptyTitle')}</p>
+        <p>{T('aiChat.emptyHint')}</p>
+      </div>
+    {/if}
     {#each thread as m, i (i)}
       <div class="msg" class:user={m.role === 'user'} class:assistant={m.role === 'assistant'}>
         <span class="role">{m.role === 'user' ? T('aiChat.you') : T('aiChat.assistant')}</span>
@@ -157,18 +168,18 @@
     {/if}
   </div>
 
-  <div class="composer">
+  <form class="composer" on:submit|preventDefault={() => send()}>
     <textarea
-      rows="3"
+      rows="2"
       bind:value={input}
       placeholder={T('aiChat.placeholder')}
       disabled={busy}
       on:keydown={onKeyDown}
     />
-    <button type="button" class="send" disabled={busy || !input.trim()} on:click={() => send()}>
+    <button type="submit" class="send" disabled={busy || !input.trim()}>
       {T('aiChat.send')}
     </button>
-  </div>
+  </form>
 
   <details class="ai-settings">
     <summary>{T('aiChat.settings')}</summary>
@@ -228,53 +239,115 @@
 
 <style>
   .ai-chat {
-    margin-top: 0;
-  }
-  .title {
-    margin: 0 0 6px;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    opacity: 0.55;
-  }
-  .ctx {
-    margin: 0 0 12px;
-    font-size: 0.78rem;
-    opacity: 0.5;
-    word-break: break-all;
-  }
-  .thread {
+    height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: min(42vh, 420px);
-    overflow-y: auto;
-    padding: 4px 0 12px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--dv-border);
+    margin: 0;
+    overflow: hidden;
   }
-  .msg {
-    border-radius: 10px;
-    padding: 8px 10px;
-    font-size: 0.88rem;
-    line-height: 1.45;
+  .ai-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 1px 0 9px;
+    border-bottom: 1px solid var(--dv-border);
+    flex-shrink: 0;
+  }
+  .ai-head-copy {
+    min-width: 0;
+    flex: 1;
+  }
+  .title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 650;
+    letter-spacing: 0;
+    text-transform: none;
+    opacity: 0.82;
+  }
+  .ctx {
+    margin: 3px 0 0;
+    color: var(--dv-muted);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    opacity: 0.88;
+    overflow: hidden;
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: normal;
+  }
+  .ai-mode {
+    flex: 0 0 auto;
+    max-width: 76px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 2px 6px;
+    border-radius: 5px;
     border: 1px solid var(--dv-border);
     background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+    color: var(--dv-muted);
+    font-size: 0.68rem;
+    line-height: 1.25;
+  }
+  .thread {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    padding: 0 1px 2px 0;
+  }
+  .ai-empty {
+    min-height: 132px;
+    display: grid;
+    align-content: center;
+    gap: 4px;
+    padding: 14px 12px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--dv-border) 75%, transparent);
+    background: color-mix(in srgb, var(--dv-fg) 3%, transparent);
+    color: var(--dv-muted);
+    font-size: 0.78rem;
+    line-height: 1.42;
+  }
+  .ai-empty p {
+    margin: 0;
+  }
+  .empty-title {
+    color: color-mix(in srgb, var(--dv-fg) 82%, var(--dv-muted));
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .msg {
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    border: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-fg) 3%, transparent);
   }
   .msg.user {
-    border-color: rgba(120, 160, 255, 0.28);
-    background: rgba(80, 120, 255, 0.08);
+    border-color: color-mix(in srgb, var(--dv-accent) 22%, var(--dv-border));
+    background: color-mix(in srgb, var(--dv-accent) 8%, transparent);
   }
   .role {
     display: block;
     font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    opacity: 0.45;
+    color: var(--dv-muted);
+    letter-spacing: 0;
+    opacity: 0.9;
     margin-bottom: 4px;
   }
   .body {
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
   .typing {
     opacity: 0.55;
@@ -286,45 +359,62 @@
     }
   }
   .composer {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--dv-border);
+    flex-shrink: 0;
   }
   .composer textarea {
     width: 100%;
     box-sizing: border-box;
-    resize: vertical;
-    min-height: 72px;
+    resize: none;
+    min-height: 62px;
+    max-height: 120px;
     padding: 8px 10px;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid var(--dv-border);
     background: var(--dv-input);
     color: inherit;
     font-family: inherit;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+    line-height: 1.4;
   }
   .send {
-    align-self: flex-end;
-    padding: 8px 16px;
-    border-radius: 8px;
+    align-self: end;
+    min-width: 54px;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 6px;
     border: 1px solid var(--dv-border);
-    background: rgba(80, 120, 255, 0.28);
+    background: color-mix(in srgb, var(--dv-accent) 22%, transparent);
     color: var(--dv-fg);
     cursor: pointer;
+    font-size: 0.78rem;
   }
   .send:disabled {
     opacity: 0.45;
     cursor: not-allowed;
   }
   .ai-settings {
-    margin-top: 4px;
-    font-size: 0.82rem;
+    margin: 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--dv-border);
+    font-size: 0.78rem;
+    flex-shrink: 0;
+    max-height: 42%;
+    overflow-y: auto;
   }
   .ai-settings summary {
     cursor: pointer;
-    opacity: 0.7;
+    color: var(--dv-muted);
     margin-bottom: 8px;
+    list-style: none;
+    user-select: none;
+  }
+  .ai-settings summary::-webkit-details-marker {
+    display: none;
   }
   .ai-settings label {
     display: flex;
@@ -343,14 +433,14 @@
   .sys-prompt {
     width: 100%;
     box-sizing: border-box;
-    min-height: 88px;
+    min-height: 78px;
     padding: 8px 10px;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid var(--dv-border);
     background: var(--dv-input);
     color: inherit;
     font-family: inherit;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     line-height: 1.45;
     resize: vertical;
   }
@@ -366,7 +456,7 @@
   .save-cfg {
     margin-top: 6px;
     padding: 6px 12px;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid var(--dv-border);
     background: color-mix(in srgb, var(--dv-fg) 8%, transparent);
     color: inherit;

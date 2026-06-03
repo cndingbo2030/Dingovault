@@ -1,7 +1,5 @@
 <script>
   import { tick } from 'svelte'
-  import { fly, fade } from 'svelte/transition'
-  import { cubicOut } from 'svelte/easing'
   import { ListVaultPages, SearchBlocks } from '../wailsjs/go/bridge/App.js'
   import { rankPagePaths } from './fuzzyMatch.js'
   import { readRecentPages } from './recentPages.js'
@@ -68,12 +66,16 @@
   $: rows = (() => {
     const q = query.trim()
     if (!q) {
+      const pageSet = new Set(pageIndex)
       const recent = readRecentPages()
-      return recent.slice(0, 14).map((path) => ({
-        kind: /** @type {'page'} */ ('page'),
-        path,
-        badge: T('palette.badgeRecent')
-      }))
+      return recent
+        .filter((path) => !pageSet.size || pageSet.has(path))
+        .slice(0, 14)
+        .map((path) => ({
+          kind: /** @type {'page'} */ ('page'),
+          path,
+          badge: T('palette.badgeRecent')
+        }))
     }
     const ranked = rankPagePaths(q, pageIndex, 10)
     const pageRows = ranked.map((r) => ({
@@ -199,7 +201,6 @@
     class="palette-backdrop"
     role="presentation"
     tabindex="-1"
-    transition:fade={{ duration: 140 }}
     on:click={onClose}
     on:keydown|stopPropagation
   ></div>
@@ -208,7 +209,6 @@
     role="dialog"
     aria-modal="true"
     aria-label={T('palette.aria')}
-    transition:fly={{ y: -10, duration: 220, easing: cubicOut }}
   >
     <div class="palette-head">
       <span class="kbd-hint">{T('palette.hint')}</span>
@@ -286,12 +286,12 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 40;
+    z-index: 1000;
   }
   .palette {
     position: fixed;
     left: 50%;
-    top: 16%;
+    top: 72px;
     transform: translateX(-50%);
     width: min(580px, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
@@ -299,7 +299,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    z-index: 50;
+    z-index: 1001;
     background: var(--dv-panel, #1a1a20);
     border: 1px solid var(--dv-border, rgba(255, 255, 255, 0.1));
     border-radius: 12px;

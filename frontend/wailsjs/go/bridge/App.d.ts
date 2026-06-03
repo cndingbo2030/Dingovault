@@ -21,8 +21,6 @@ export function GetAppVersion():Promise<string>;
 
 export function GetBacklinks(arg1:string):Promise<Array<domain.Block>>;
 
-export function HealthResetLocalSearchIndex():Promise<void>;
-
 export function GetLocale():Promise<string>;
 
 export function GetPage(arg1:string):Promise<Array<bridge.PageBlock>>;
@@ -37,19 +35,25 @@ export function GetTheme():Promise<string>;
 
 export function GetWikiGraph():Promise<storage.WikiGraph>;
 
+export function HealthResetLocalSearchIndex():Promise<void>;
+
 export function IndentBlock(arg1:string):Promise<void>;
 
 export function InsertBlockAfter(arg1:string,arg2:string):Promise<void>;
 
 export function IsAIReachable():Promise<boolean>;
 
+export function ListLANSyncPeers():Promise<Array<bridge.LANPeerDTO>>;
+
 export function ListPagesByProperty(arg1:string,arg2:string):Promise<Array<string>>;
+
+export function ListVaultFiles():Promise<Array<bridge.VaultFileDTO>>;
 
 export function ListVaultPages():Promise<Array<string>>;
 
-export function ListLANSyncPeers():Promise<Array<bridge.LANPeerDTO>>;
-
 export function NotesRoot():Promise<string>;
+
+export function OpenVaultFile(arg1:string):Promise<void>;
 
 export function OutdentBlock(arg1:string):Promise<void>;
 
@@ -61,9 +65,13 @@ export function ReorderBlockBefore(arg1:string,arg2:string):Promise<void>;
 
 export function ResolveWikilink(arg1:string):Promise<string>;
 
+export function RunVaultCommand(arg1:string):Promise<bridge.ConsoleCommandResult>;
+
 export function SearchBlocks(arg1:string):Promise<Array<storage.BlockSearchHit>>;
 
 export function SetAISettings(arg1:bridge.AISettingsDTO):Promise<void>;
+
+export function SetHealthRescan(arg1:any):Promise<void>;
 
 export function SetLocale(arg1:string):Promise<void>;
 
@@ -75,14 +83,14 @@ export function StartAIInlineStream(arg1:string,arg2:string,arg3:string):Promise
 
 export function StartLANSyncAdvertise():Promise<string>;
 
-export function StopLANSyncAdvertise():Promise<void>;
-
 export function Startup(arg1:context.Context):Promise<void>;
+
+export function StopLANSyncAdvertise():Promise<void>;
 
 export function SuggestTagsForBlock(arg1:string):Promise<Array<string>>;
 
-export function SyncVaultWebDAV():Promise<void>;
-
 export function SyncVaultS3():Promise<void>;
+
+export function SyncVaultWebDAV():Promise<void>;
 
 export function UpdateBlock(arg1:string,arg2:string):Promise<void>;

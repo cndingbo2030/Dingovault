@@ -76,6 +76,19 @@ Current implementations:
   - optional vault scanning when `-notes` is provided,
   - suitable for shared SaaS-style deployments.
 
+## Desktop Workspace Architecture
+
+The v1.5.0 desktop shell is intentionally closer to an IDE than a marketing site. The UI is organized around reusable work surfaces:
+
+- **Activity rail**: primary mode switches for files, graph, console, AI, and settings.
+- **Files pane**: `ListVaultFiles` returns supported vault files with type metadata; Markdown routes to `GetPage`, while non-Markdown uses `OpenVaultFile` and the OS default handler.
+- **Editor pane**: block operations remain file-backed through graph service mutations (`UpdateBlock`, `InsertBlockAfter`, indent/outdent, slash operations, reorder).
+- **Inspector pane**: backlinks, semantically related blocks, and AI Chat share the current page context.
+- **Graph pane**: `GetWikiGraph` produces page-level nodes and links; the frontend applies force layout, pan, wheel zoom, hover emphasis, and node dragging.
+- **Workspace console**: bridge commands run inside the vault root with bounded output and tests around command execution.
+
+This keeps the desktop UI dense and operational while preserving Markdown files as the source of truth.
+
 ## Migration and Integrity
 
 - SQLite schema uses `PRAGMA user_version` and incremental migrations.

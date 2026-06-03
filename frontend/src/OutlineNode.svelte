@@ -40,9 +40,9 @@
   export let onToggleSelect = () => {}
   /** @type {(movingId: string, beforeId: string) => Promise<void>} */
   export let onReorderBefore = async () => {}
-  /** Mobile: swipe right on rail — cycle TODO */
+  /** @type {(id: string) => Promise<void>} Mobile: swipe right on rail, cycle TODO. */
   export let onSwipeTodo = async () => {}
-  /** Mobile: swipe left on rail — delete / clear block (confirm in parent) */
+  /** @type {(id: string) => Promise<void>} Mobile: swipe left on rail, clear block after parent confirmation. */
   export let onSwipeClear = async () => {}
 
   let local = node.content
@@ -50,6 +50,7 @@
   let lastNodeId = ''
   /** @type {HTMLTextAreaElement | undefined} */
   let taEl
+  let autosizeFrame = 0
 
   let slashOpen = false
   let slashStart = 0
@@ -74,6 +75,7 @@
   let aiBackup = ''
   /** @type {string[]} */
   let tagSuggestions = []
+  let focused = false
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let tagSuggestTimer
   /** @type {((e: Event) => void) | undefined} */
@@ -90,7 +92,9 @@
     aiPanelOpen = false
     aiStreaming = false
     tagSuggestions = []
+    focused = false
     unwireAIWin()
+    scheduleAutosize()
   }
 
   function newAIopID() {
@@ -184,7 +188,14 @@
     if (local.includes(token)) return
     const pad = local.length && !/\s$/.test(local) ? ' ' : ''
     local = (local + pad + token).trimEnd()
+    tagSuggestions = []
     void onFlushSave(node.id, local)
+  }
+
+  function scheduleTagSuggestions() {
+    if (tagSuggestTimer) clearTimeout(tagSuggestTimer)
+    if (!focused || !local.trim()) return
+    tagSuggestTimer = window.setTimeout(() => void loadTagSuggestions(), 560)
   }
 
   async function loadTagSuggestions() {
@@ -203,7 +214,19 @@
   onDestroy(() => {
     unwireAIWin()
     if (tagSuggestTimer) clearTimeout(tagSuggestTimer)
+    if (autosizeFrame) cancelAnimationFrame(autosizeFrame)
   })
+
+  function scheduleAutosize() {
+    if (typeof requestAnimationFrame === 'undefined') return
+    if (autosizeFrame) cancelAnimationFrame(autosizeFrame)
+    autosizeFrame = requestAnimationFrame(() => {
+      autosizeFrame = 0
+      if (!taEl) return
+      taEl.style.height = '0px'
+      taEl.style.height = `${Math.max(34, taEl.scrollHeight)}px`
+    })
+  }
 
   function queueSave() {
     if (saveTimer) clearTimeout(saveTimer)
@@ -245,6 +268,7 @@
   /** @param {Event} e */
   function onInput(e) {
     queueSave()
+    scheduleAutosize()
     detectSlash(/** @type {HTMLTextAreaElement} */ (e.target))
   }
 
@@ -325,7 +349,6 @@
     dragOver = true
   }
 
-  /** @param {DragEvent} e */
   function onDragLeaveRow() {
     dragOver = false
   }
@@ -381,6 +404,8 @@
   class="row"
   class:hasSlash={slashOpen || aiPanelOpen}
   class:dragOver
+  class:selected
+  class:hasKids
   style="--depth: {depth}; padding-left: {4 + depth * 14}px; border-left-width: {depth > 0 ? 1 : 0}px"
   role="group"
   on:dragover={onDragOverRow}
@@ -425,31 +450,38 @@
         on:keydown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') e.preventDefault()
         }}
-      >⠿</span>
+      >⋮</span>
     </div>
     <div class="edit">
     <textarea
       bind:this={taEl}
       class="ta"
       class:ai-generating={aiStreaming}
-      rows="2"
+      rows="1"
       data-block-id={node.id}
       bind:value={local}
       on:input={(e) => {
         tagSuggestions = []
         onInput(e)
+        scheduleTagSuggestions()
       }}
       on:blur={() => {
+        focused = false
         flush()
         closeSlash()
         if (tagSuggestTimer) clearTimeout(tagSuggestTimer)
-        tagSuggestTimer = window.setTimeout(() => void loadTagSuggestions(), 650)
+        tagSuggestTimer = window.setTimeout(() => {
+          tagSuggestions = []
+        }, 120)
       }}
       on:focus={() => {
+        focused = true
+        scheduleAutosize()
         if (tagSuggestTimer) {
           clearTimeout(tagSuggestTimer)
           tagSuggestTimer = undefined
         }
+        scheduleTagSuggestions()
       }}
       on:keydown={onKeydown}
     ></textarea>
@@ -477,11 +509,16 @@
         {/each}
       </div>
     {/if}
-    {#if tagSuggestions.length}
+    {#if focused && tagSuggestions.length}
       <div class="tag-suggest" aria-label={T('outline.tagSuggestAria')}>
         <span class="tag-hint">{T('outline.tagHint')}</span>
         {#each tagSuggestions as tg (tg)}
-          <button type="button" class="tag-chip" on:click={() => appendSuggestedTag(tg)}>#{tg}</button>
+          <button
+            type="button"
+            class="tag-chip"
+            on:mousedown={(e) => e.preventDefault()}
+            on:click={() => appendSuggestedTag(tg)}
+          >#{tg}</button>
         {/each}
       </div>
     {/if}
@@ -540,28 +577,45 @@
 <style>
   .row {
     position: relative;
-    margin-bottom: 8px;
+    margin-bottom: 3px;
     border-left: 0 solid var(--dv-rail, rgba(255, 255, 255, 0.08));
-    border-radius: 8px;
+    border-radius: 5px;
     transition: background 0.12s ease;
   }
   .row.dragOver {
-    background: rgba(100, 140, 255, 0.08);
+    background: color-mix(in srgb, var(--dv-fg, #111) 7%, transparent);
   }
   .row-inner {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: 4px;
   }
   .row-controls {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    padding-top: 6px;
+    padding-top: 5px;
     flex-shrink: 0;
     width: 28px;
     touch-action: pan-y;
+  }
+  .sel,
+  .drag-handle {
+    opacity: 0;
+    transition:
+      opacity 0.12s ease,
+      color 0.12s ease;
+  }
+  .row:hover .sel,
+  .row:focus-within .sel,
+  .row.selected .sel,
+  .row.hasSlash .sel,
+  .row:hover .drag-handle,
+  .row:focus-within .drag-handle,
+  .row.selected .drag-handle,
+  .row.hasSlash .drag-handle {
+    opacity: 0.72;
   }
   @media (max-width: 640px) {
     .row-controls {
@@ -585,14 +639,18 @@
     .drag-handle {
       font-size: 0.85rem;
       padding: 6px 0 8px;
-      opacity: 0.5;
+      opacity: 0.65;
+    }
+    .sel,
+    .drag-handle {
+      opacity: 0.65;
     }
   }
   .sel input {
     width: 14px;
     height: 14px;
     cursor: pointer;
-    accent-color: rgba(120, 140, 255, 0.9);
+    accent-color: color-mix(in srgb, var(--dv-accent, #6f4fd8) 72%, var(--dv-fg, #111));
   }
   .fold {
     border: none;
@@ -603,6 +661,7 @@
     line-height: 1;
     padding: 2px 0;
     width: 22px;
+    opacity: 0.55;
   }
   .fold:hover {
     color: var(--dv-fg, #fff);
@@ -614,12 +673,15 @@
   }
   .drag-handle {
     cursor: grab;
-    font-size: 0.65rem;
+    font-size: 0.78rem;
     line-height: 1;
-    letter-spacing: -0.12em;
-    opacity: 0.35;
     user-select: none;
     padding: 2px 0 4px;
+    color: var(--dv-muted, rgba(255, 255, 255, 0.45));
+  }
+  .drag-handle:hover {
+    color: var(--dv-fg, #fff);
+    opacity: 1;
   }
   .drag-handle:active {
     cursor: grabbing;
@@ -631,28 +693,38 @@
   }
   .ta {
     width: 100%;
-    resize: vertical;
-    min-height: 2.75rem;
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid var(--dv-border, rgba(255, 255, 255, 0.12));
-    background: var(--dv-input, rgba(0, 0, 0, 0.2));
+    resize: none;
+    overflow: hidden;
+    min-height: 34px;
+    padding: 6px 8px;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    background: transparent;
     color: inherit;
-    font-family: var(--dv-font-mono, 'JetBrains Mono', ui-monospace, monospace);
-    font-size: 0.92rem;
-    line-height: 1.5;
+    font-family: var(--dv-font-editor, var(--dv-font, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif));
+    font-size: 0.9rem;
+    line-height: 1.48;
     touch-action: manipulation;
+    transition:
+      background 0.12s ease,
+      border-color 0.12s ease,
+      box-shadow 0.12s ease;
   }
   @media (max-width: 640px) {
     .ta {
       font-size: 16px;
-      min-height: 3rem;
+      min-height: 40px;
       padding: 10px 12px;
     }
   }
+  .row:hover .ta {
+    background: color-mix(in srgb, var(--dv-fg) 3%, transparent);
+  }
   .ta:focus {
     outline: none;
-    border-color: rgba(120, 160, 255, 0.4);
+    border-color: color-mix(in srgb, var(--dv-fg, #111) 18%, var(--dv-border, rgba(0, 0, 0, 0.12)));
+    background: color-mix(in srgb, var(--dv-fg, #111) 3.5%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--dv-accent, #6f4fd8) 18%, transparent);
   }
   .slash-menu {
     position: absolute;
@@ -698,47 +770,56 @@
   .wikis {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 4px;
+    gap: 4px;
+    margin: 1px 0 3px;
+    opacity: 0.74;
+    transition: opacity 0.12s ease;
+  }
+  .row:hover .wikis,
+  .row:focus-within .wikis {
+    opacity: 1;
   }
   .wiki {
-    font-size: 0.75rem;
-    padding: 2px 8px;
-    border-radius: 999px;
-    border: 1px solid rgba(120, 160, 255, 0.35);
-    background: rgba(80, 120, 255, 0.12);
-    color: #b4c8ff;
+    font-size: 0.72rem;
+    padding: 1px 6px 2px;
+    border-radius: 5px;
+    border: 1px solid color-mix(in srgb, var(--dv-accent, #6f4fd8) 20%, var(--dv-border, rgba(0, 0, 0, 0.12)));
+    background: color-mix(in srgb, var(--dv-accent, #6f4fd8) 8%, var(--dv-panel, #fff));
+    color: color-mix(in srgb, var(--dv-accent, #6f4fd8) 72%, var(--dv-fg, #111));
+    font-family: var(--dv-font, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif);
+    cursor: pointer;
   }
   .wiki:hover {
-    background: rgba(80, 120, 255, 0.22);
+    background: color-mix(in srgb, var(--dv-accent, #6f4fd8) 13%, var(--dv-panel, #fff));
   }
   .tag-suggest {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    margin-top: 6px;
-    padding: 6px 8px;
-    border-radius: 8px;
-    border: 1px dashed color-mix(in srgb, var(--dv-fg) 16%, transparent);
-    background: color-mix(in srgb, var(--dv-fg) 3%, transparent);
+    margin: 4px 0 5px;
+    padding: 5px 7px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--dv-fg) 12%, transparent);
+    background: color-mix(in srgb, var(--dv-panel, #fff) 88%, var(--dv-fg, #111) 4%);
   }
   .tag-hint {
     font-size: 0.72rem;
-    opacity: 0.5;
+    color: var(--dv-muted, rgba(0, 0, 0, 0.55));
+    opacity: 0.82;
     margin-right: 4px;
   }
   .tag-chip {
     font-size: 0.72rem;
     padding: 2px 8px;
     border-radius: 999px;
-    border: 1px solid rgba(160, 200, 140, 0.35);
-    background: rgba(100, 160, 90, 0.12);
-    color: #c8e6b8;
+    border: 1px solid color-mix(in srgb, var(--dv-accent-2, #16865a) 24%, var(--dv-border, rgba(0, 0, 0, 0.12)));
+    background: color-mix(in srgb, var(--dv-accent-2, #16865a) 10%, var(--dv-panel, #fff));
+    color: color-mix(in srgb, var(--dv-accent-2, #16865a) 74%, var(--dv-fg, #111));
     cursor: pointer;
   }
   .tag-chip:hover {
-    background: rgba(100, 160, 90, 0.22);
+    background: color-mix(in srgb, var(--dv-accent-2, #16865a) 16%, var(--dv-panel, #fff));
   }
   .ai-pop {
     position: absolute;

@@ -35,7 +35,10 @@
     GetLocale,
     SetLocale,
     IsAIReachable,
-    HealthResetLocalSearchIndex
+    HealthResetLocalSearchIndex,
+    ListVaultPages,
+    ListVaultFiles,
+    OpenVaultFile
   } from '../wailsjs/go/bridge/App.js'
   import { EventsOn } from '../wailsjs/runtime/runtime.js'
   import { locale, messages, tr, detectBrowserLocale, normalizeLocaleTag } from './lib/i18n/index.js'
@@ -44,9 +47,11 @@
   import Backlinks from './Backlinks.svelte'
   import SemanticRelated from './SemanticRelated.svelte'
   import AIChatPanel from './AIChatPanel.svelte'
+  import WorkspaceConsole from './WorkspaceConsole.svelte'
+  import SettingsDialog from './SettingsDialog.svelte'
   import CommandPalette from './CommandPalette.svelte'
   import ToastStack from './ToastStack.svelte'
-  import { touchRecentPage } from './recentPages.js'
+  import { readRecentPages, touchRecentPage } from './recentPages.js'
   import { pushToast } from './toastStore.js'
   import { toolbarEntries, sidebarEntries } from './pluginRegistry.js'
   import { hapticLight } from './lib/haptic.js'
@@ -57,6 +62,7 @@
   let roots = []
   let paletteOpen = false
   let err = ''
+  let staleBlockRecovering = false
   let lastFileEvent = ''
   let indexEpoch = 0
   let pageLoading = false
@@ -75,10 +81,17 @@
   /** @type {string[]} */
   let selectedIds = []
   let graphOpen = false
-  let aboutOpen = false
-  /** @type {'backlinks' | 'ai'} */
+  let settingsOpen = false
+  let newPageDialogOpen = false
+  let newPagePath = ''
+  /** @type {HTMLInputElement | undefined} */
+  let newPageInput
+  let consoleOpen = false
+  let pagesOpen = true
+  let inspectorOpen = true
+  /** @type {'backlinks' | 'related' | 'ai'} */
   let sideTab = 'backlinks'
-  /** @type {'outline' | 'related' | 'side'} */
+  /** @type {'outline' | 'pages' | 'side'} */
   let mobilePanel = 'outline'
   let sideSheetOpen = false
   /** @type {string[]} */
@@ -93,6 +106,14 @@
 
   /** @type {boolean} */
   let aiReachable = true
+  /** @type {string[]} */
+  let vaultPages = []
+  /** @type {{ path: string, name: string, ext: string, kind: string, size?: number, modifiedUnix?: number }[]} */
+  let vaultFiles = []
+  /** @type {string[]} */
+  let recentPaths = []
+  let pageFilter = ''
+  let pagesLoading = false
 
   async function refreshAIReach() {
     try {
@@ -141,10 +162,43 @@
   $: document.documentElement.dataset.theme = theme
 
   /** @param {unknown} e */
+  function errorText(e) {
+    if (e instanceof Error) return e.message || String(e)
+    return String(e)
+  }
+
+  /** @param {unknown} e */
   function notifyErr(e) {
-    const m = String(e)
+    const m = errorText(e)
     err = m
     pushToast(m, 'error')
+  }
+
+  /** @param {unknown} e */
+  function isStaleBlockError(e) {
+    const m = errorText(e).toLowerCase()
+    return m.includes('lookup block:') && m.includes('block not found:')
+  }
+
+  /** @param {unknown} e */
+  async function recoverStaleBlockError(e) {
+    if (!isStaleBlockError(e)) return false
+    err = ''
+    if (staleBlockRecovering) return true
+    staleBlockRecovering = true
+    try {
+      await loadPage(pagePath, { skipHistory: true, softNav: true })
+      pushToast(T('app.blockRecovered'), 'info', 2400)
+    } finally {
+      staleBlockRecovering = false
+    }
+    return true
+  }
+
+  /** @param {unknown} e */
+  async function handleMutationError(e) {
+    if (await recoverStaleBlockError(e)) return
+    notifyErr(e)
   }
 
   /** @param {string} root */
@@ -154,6 +208,87 @@
     const parts = p.split(/[/\\]/).filter(Boolean)
     return parts.length ? parts[parts.length - 1] : T('app.vault')
   }
+
+  /** @param {string} p */
+  function pageTitle(p) {
+    const seg = (p || '').split(/[/\\]/).pop() || p
+    return seg.replace(/\.(md|markdown)$/i, '')
+  }
+
+  /** @param {string} p */
+  function pageFolder(p) {
+    const parts = (p || '').split(/[/\\]/).filter(Boolean)
+    if (parts.length <= 1) return ''
+    return parts.slice(0, -1).join('/')
+  }
+
+  /** @param {string} p */
+  function isMarkdownPath(p) {
+    return /\.(md|markdown)$/i.test(p || '')
+  }
+
+  /** @param {{ path?: string, name?: string, kind?: string }} file */
+  function isMarkdownFile(file) {
+    return file?.kind === 'markdown' || isMarkdownPath(file?.path || file?.name || '')
+  }
+
+  /** @param {{ path?: string, name?: string }} file */
+  function fileTitle(file) {
+    return pageTitle(file?.name || file?.path || '')
+  }
+
+  /** @param {{ ext?: string, kind?: string }} file */
+  function fileKindLabel(file) {
+    if (!file || isMarkdownFile(file)) return ''
+    const ext = (file.ext || '').toUpperCase()
+    return ext || (file.kind || '').toUpperCase()
+  }
+
+  /** @param {string} rel */
+  function vaultFileFromPage(rel) {
+    const name = (rel || '').split(/[/\\]/).pop() || rel
+    return { path: rel, name, ext: 'md', kind: 'markdown' }
+  }
+
+  function refreshRecentPaths() {
+    recentPaths = readRecentPages()
+  }
+
+  async function loadVaultPages() {
+    pagesLoading = true
+    try {
+      const [pages, files] = await Promise.all([
+        ListVaultPages().catch(() => []),
+        ListVaultFiles().catch(() => [])
+      ])
+      vaultPages = Array.isArray(pages) ? pages : []
+      vaultFiles = Array.isArray(files) ? files : []
+      if (!vaultFiles.length) vaultFiles = vaultPages.map(vaultFileFromPage)
+    } catch {
+      vaultPages = []
+      vaultFiles = []
+    } finally {
+      pagesLoading = false
+    }
+  }
+
+  $: vaultFilePathSet = new Set((vaultFiles.length ? vaultFiles : (vaultPages || []).map(vaultFileFromPage)).map((f) => f.path))
+  $: visibleRecentPaths = recentPaths
+    .filter((rel) => rel !== pagePath)
+    .filter((rel) => !vaultFilePathSet.size || vaultFilePathSet.has(rel))
+    .slice(0, 6)
+
+  $: filteredVaultFiles = (() => {
+    const q = pageFilter.trim().toLowerCase()
+    const files = vaultFiles.length ? vaultFiles : (vaultPages || []).map(vaultFileFromPage)
+    if (!q) return files.slice(0, 360)
+    return files
+      .filter((f) => {
+        const p = f.path || ''
+        return p.toLowerCase().includes(q) || fileTitle(f).toLowerCase().includes(q) || (f.kind || '').includes(q)
+      })
+      .slice(0, 240)
+  })()
 
   /** @param {string} code */
   async function setLanguage(code) {
@@ -186,6 +321,7 @@
 
   $: pagePath, loadCollapsedFromStorage()
 
+  /** @param {string} id */
   function toggleCollapse(id) {
     collapsedState = { ...collapsedState, [id]: !collapsedState[id] }
     try {
@@ -229,6 +365,8 @@
       graphData = await GetWikiGraph()
       graphSemanticEdges = []
       graphSemanticOn = false
+      inspectorOpen = false
+      consoleOpen = false
       graphOpen = true
     } catch (e) {
       notifyErr(e)
@@ -250,14 +388,14 @@
     }
   }
 
-  async function openAbout() {
+  async function openSettings() {
     err = ''
     try {
       appVersion = await GetAppVersion()
     } catch {
       appVersion = ''
     }
-    aboutOpen = true
+    settingsOpen = true
   }
 
   /** @param {string} movingId @param {string} beforeId */
@@ -268,7 +406,7 @@
       await ReorderBlockBefore(movingId, beforeId)
       await loadPage(pagePath)
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -281,7 +419,7 @@
       await CycleBlockTodo(id)
       await loadPage(pagePath, { focusBlockId: id })
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -295,7 +433,7 @@
       await UpdateBlock(id, '')
       await loadPage(pagePath, { focusBlockId: id })
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -321,8 +459,8 @@
       paletteOpen = false
       return true
     }
-    if (aboutOpen) {
-      aboutOpen = false
+    if (settingsOpen) {
+      settingsOpen = false
       return true
     }
     if (graphOpen) {
@@ -340,6 +478,17 @@
       return true
     }
     return false
+  }
+
+  function goBackPage() {
+    if (graphOpen) {
+      graphOpen = false
+      return
+    }
+    if (navStack.length <= 1) return
+    const prev = navStack[navStack.length - 2]
+    navStack = navStack.slice(0, -1)
+    void loadPage(prev, { skipHistory: true })
   }
 
   onMount(() => {
@@ -388,7 +537,9 @@
     NotesRoot()
       .then((p) => {
         notesRoot = p
+        refreshRecentPaths()
         void refreshAIReach()
+        void loadVaultPages()
         return loadPage(pagePath)
       })
       .catch((e) => notifyErr(e))
@@ -409,6 +560,7 @@
 
     EventsOn('file-updated', async (payload) => {
       indexEpoch++
+      void loadVaultPages()
       if (pulseTimer) clearTimeout(pulseTimer)
       indexPulse = true
       pulseTimer = setTimeout(() => {
@@ -494,13 +646,14 @@
 
   /**
    * @param {string} rel
-   * @param {{ focusBlockId?: string, caretOffset?: number, skipHistory?: boolean, replaceTop?: boolean, softNav?: boolean }} [opts]
+   * @param {{ focusBlockId?: string, caretOffset?: number, skipHistory?: boolean, replaceTop?: boolean, softNav?: boolean, keepGraph?: boolean }} [opts]
    */
   async function loadPage(rel, opts) {
     const focusId = opts?.focusBlockId
     const caret = opts?.caretOffset
     const skipHist = opts?.skipHistory
     const replaceTop = opts?.replaceTop
+    if (!opts?.keepGraph) graphOpen = false
     const softNav = !!opts?.softNav && rel === pagePath && roots.length > 0
     if (!skipHist) {
       if (navStack.length === 0) {
@@ -518,6 +671,7 @@
       pagePath = rel
       selectedIds = []
       touchRecentPage(rel)
+      refreshRecentPaths()
       if (focusId) {
         await tick()
         requestAnimationFrame(() => {
@@ -537,10 +691,53 @@
     }
   }
 
+  /** @param {{ path: string, name?: string, kind?: string }} file */
+  async function openVaultEntry(file) {
+    if (!file?.path) return
+    if (isMarkdownFile(file)) {
+      mobilePanel = 'outline'
+      await loadPage(file.path)
+      return
+    }
+    err = ''
+    try {
+      await OpenVaultFile(file.path)
+      pushToast(T('app.openedExternal', { path: file.path }), 'info')
+    } catch (e) {
+      notifyErr(e)
+    }
+  }
+
+  async function openNewPageDialog() {
+    newPagePath = T('app.newPageDefault')
+    newPageDialogOpen = true
+    await tick()
+    newPageInput?.focus()
+    newPageInput?.select()
+  }
+
+  async function submitNewPage() {
+    err = ''
+    let rel = newPagePath.trim()
+    if (!rel) return
+    if (!isMarkdownPath(rel)) rel += '.md'
+    try {
+      await EnsurePage(rel)
+      newPageDialogOpen = false
+      pageFilter = ''
+      void loadVaultPages()
+      await loadPage(rel, { replaceTop: true })
+      pushToast(T('app.pageCreated', { path: rel }), 'info')
+    } catch (e) {
+      notifyErr(e)
+    }
+  }
+
   async function openOrCreate() {
     err = ''
     try {
       await EnsurePage(pagePath)
+      void loadVaultPages()
       await loadPage(pagePath)
     } catch (e) {
       notifyErr(e)
@@ -572,7 +769,7 @@
       try {
         await UpdateBlock(id, text)
       } catch (e) {
-        notifyErr(e)
+        await handleMutationError(e)
       }
     }, 500)
   }
@@ -586,7 +783,7 @@
     try {
       await UpdateBlock(id, text)
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -610,7 +807,7 @@
       await InsertBlockAfter(id, '')
       await loadPage(pagePath)
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -632,7 +829,7 @@
       await IndentBlock(id)
       await loadPage(pagePath, { focusBlockId: id, caretOffset: caret })
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -645,7 +842,7 @@
       await OutdentBlock(id)
       await loadPage(pagePath, { focusBlockId: id, caretOffset: caret })
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -658,7 +855,7 @@
       await CycleBlockTodo(id)
       await loadPage(pagePath, { focusBlockId: id, caretOffset: caret })
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -671,7 +868,7 @@
       await ApplySlashOp(id, op)
       await loadPage(pagePath, { focusBlockId: id, caretOffset: caret })
     } catch (e) {
-      notifyErr(e)
+      await handleMutationError(e)
     }
   }
 
@@ -700,36 +897,112 @@
 </script>
 
 <main
-  class="layout zen"
+  class="layout zen ide-shell"
   class:side-sheet-open={sideSheetOpen && chromeMode === 'small-tablet'}
+  class:console-open={consoleOpen}
+  class:pages-collapsed={!pagesOpen}
+  class:inspector-collapsed={!inspectorOpen}
   data-chrome-mode={chromeMode}
 >
-  <nav class="breadcrumbs" class:index-pulse={indexPulse} aria-label={T('app.breadcrumb')}>
-    <span class="crumb vault">{vaultBasename(notesRoot)}</span>
-    {#if breadcrumbSegments.length > 1}
-      {#each breadcrumbSegments.slice(0, -1) as seg}
-        <span class="sep" aria-hidden="true">›</span>
-        <span class="crumb">{seg}</span>
-      {/each}
-    {/if}
-    {#if breadcrumbSegments.length}
-      <span class="sep" aria-hidden="true">›</span>
-      <span class="crumb current">{breadcrumbSegments[breadcrumbSegments.length - 1]}</span>
-    {/if}
-  </nav>
+  <aside class="activity-rail" aria-label={T('activity.aria')}>
+    <button
+      type="button"
+      class="rail-btn"
+      class:active={pagesOpen}
+      aria-label={T('activity.files')}
+      title={T('activity.files')}
+      on:click={() => (pagesOpen = !pagesOpen)}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H10l2 2h5.5A2.5 2.5 0 0 1 20 7.5v11A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5zM6.5 5A.5.5 0 0 0 6 5.5V8h12v-.5a.5.5 0 0 0-.5-.5h-6.33l-2-2zM6 10v8.5a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5V10z" /></svg>
+    </button>
+    <button
+      type="button"
+      class="rail-btn"
+      class:active={graphOpen}
+      aria-label={T('activity.graph')}
+      title={T('activity.graph')}
+      on:click={() => openGraph()}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.4" fill="currentColor" /><circle cx="18" cy="8" r="2.4" fill="currentColor" /><circle cx="9" cy="18" r="2.4" fill="currentColor" /><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M8 7.2l8 1.6M10.2 16.4l5.8-7M6.7 8.3l2.2 8" /></svg>
+    </button>
+    <button
+      type="button"
+      class="rail-btn"
+      class:active={consoleOpen}
+      aria-label={T('activity.console')}
+      title={T('activity.console')}
+      on:click={() => (consoleOpen = !consoleOpen)}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2m0 2v10h16V7zm3.4 2.2 3.1 2.8-3.1 2.8-1.2-1.3L7.9 12 6.2 10.5zm4.5 4.6h6.2v1.6h-6.2z" /></svg>
+    </button>
+    <button
+      type="button"
+      class="rail-btn"
+      class:active={sideTab === 'ai' && inspectorOpen}
+      aria-label={T('activity.ai')}
+      title={T('activity.ai')}
+      on:click={() => {
+        inspectorOpen = true
+        sideTab = 'ai'
+      }}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.5 14.6 8l5.9.8-4.3 4.2 1 5.9L12 16.1 6.8 18.9l1-5.9-4.3-4.2L9.4 8zM12 7l-1.2 2.6-2.8.4 2 1.9-.5 2.8L12 13.3l2.5 1.4-.5-2.8 2-1.9-2.8-.4z" /></svg>
+    </button>
+    <span class="rail-spacer"></span>
+    <button
+      type="button"
+      class="rail-btn rail-pro"
+      class:active={settingsOpen}
+      aria-label={T('activity.settings')}
+      title={T('activity.settings')}
+      on:click={() => openSettings()}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.4 13.5a7.8 7.8 0 0 0 .1-1.5 7.8 7.8 0 0 0-.1-1.5l2-1.5-2-3.4-2.4 1a7 7 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A7 7 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0-.1 1.5 7.8 7.8 0 0 0 .1 1.5l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a7 7 0 0 0 2.6-1.5l2.4 1 2-3.4zM12 15.2A3.2 3.2 0 1 1 12 8.8a3.2 3.2 0 0 1 0 6.4z" /></svg>
+    </button>
+  </aside>
 
-  <header class="top">
-    <h1>{T('app.title')}</h1>
-    <p class="meta">{notesRoot || '…'}</p>
-    {#if lastFileEvent}
-      <p class="event">{T('app.lastIndex')}: <code>{lastFileEvent}</code></p>
-    {/if}
-    {#if !aiReachable}
-      <p class="ai-offline-pill" role="status">{T('app.aiOffline')}</p>
-    {/if}
-  </header>
+  <section class="workspace-stage">
+  <header class="top app-titlebar">
+    <div class="titlebar-left">
+      <button
+        type="button"
+        class="nav-icon"
+        class:active={pagesOpen}
+        aria-label={T('activity.files')}
+        title={T('activity.files')}
+        on:click={() => (pagesOpen = !pagesOpen)}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H10l2 2h5.5A2.5 2.5 0 0 1 20 7.5v11A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5zM6.5 5A.5.5 0 0 0 6 5.5V8h12v-.5a.5.5 0 0 0-.5-.5h-6.33l-2-2zM6 10v8.5a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5V10z" /></svg>
+      </button>
+      {#if graphOpen || navStack.length > 1}
+        <button
+          type="button"
+          class="nav-icon"
+          aria-label={T('app.back')}
+          title={T('app.back')}
+          on:click={goBackPage}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14.8 5.4 8.9 11.4l5.9 6-1.6 1.5L5.8 11.4l7.4-7.4z" /></svg>
+        </button>
+      {/if}
+      <button
+        type="button"
+        class="nav-icon"
+        aria-label={T('app.search')}
+        title={T('app.search')}
+        on:click={() => (paletteOpen = true)}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m20 20-4.2-4.2M18 10.8a7.2 7.2 0 1 1-14.4 0 7.2 7.2 0 0 1 14.4 0Z" /></svg>
+      </button>
+      <div class="tab-strip" aria-label={T('app.openTabs')}>
+        <button type="button" class="doc-tab active" title={pagePath}>
+          <span class="doc-tab-dot" aria-hidden="true"></span>
+          <span>{graphOpen ? T('app.pageGraph') : pageTitle(pagePath)}</span>
+        </button>
+      </div>
+    </div>
 
-  <div class="toolbar" class:tool-ribbon={chromeMode === 'tablet-master'}>
+    <div class="toolbar top-commandbar" class:tool-ribbon={chromeMode === 'tablet-master'}>
     {#if chromeMode === 'small-tablet'}
       <button
         type="button"
@@ -740,36 +1013,43 @@
         ☰ {T('app.mobileNavSide')}
       </button>
     {/if}
+    <nav class="breadcrumbs" class:index-pulse={indexPulse} aria-label={T('app.breadcrumb')}>
+      {#if graphOpen}
+        <span class="crumb current">{T('app.pageGraph')}</span>
+      {:else}
+      <span class="crumb vault">{vaultBasename(notesRoot)}</span>
+      {#if breadcrumbSegments.length > 1}
+        {#each breadcrumbSegments.slice(0, -1) as seg}
+          <span class="sep" aria-hidden="true">›</span>
+          <span class="crumb">{seg}</span>
+        {/each}
+      {/if}
+      {#if breadcrumbSegments.length}
+        <span class="sep" aria-hidden="true">›</span>
+        <span class="crumb current">{breadcrumbSegments[breadcrumbSegments.length - 1]}</span>
+      {/if}
+      {/if}
+    </nav>
     <input class="path-input" bind:value={pagePath} placeholder={T('app.pathPlaceholder')} />
-    <button type="button" class="btn" on:click={() => loadPage(pagePath, { replaceTop: true })}
-      >{T('app.open')}</button
+    <button
+      type="button"
+      class="nav-icon command-icon primary"
+      aria-label={T('app.open')}
+      title={T('app.open')}
+      on:click={() => loadPage(pagePath, { replaceTop: true })}
     >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 5h9l5 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2m8 1.8V11h4.2zM7 14v2h7.6l-2.2 2.2 1.4 1.4 4.6-4.6-4.6-4.6-1.4 1.4 2.2 2.2z" /></svg>
+    </button>
     {#if !showMobileChrome}
-      <button type="button" class="btn secondary" on:click={openOrCreate}>{T('app.ensurePage')}</button>
       <button
         type="button"
-        class="btn secondary"
-        on:click={toggleTheme}
-        title={theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+        class="nav-icon command-icon"
+        aria-label={T('app.ensurePage')}
+        title={T('app.ensurePage')}
+        on:click={openOrCreate}
       >
-        {theme === 'dark' ? T('app.themeModeLight') : T('app.themeModeDark')}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3h9l5 5v13H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2m8 2v4h4zM9 13v2h3v3h2v-3h3v-2h-3v-3h-2v3z" /></svg>
       </button>
-    {/if}
-    <span class="lang-toolbar" role="group" aria-label={T('app.langLabel')}>
-      <button
-        type="button"
-        class="btn secondary lang-btn"
-        class:active={$locale === 'en'}
-        on:click={() => setLanguage('en')}>{T('app.langEn')}</button>
-      <button
-        type="button"
-        class="btn secondary lang-btn"
-        class:active={$locale === 'zh-CN'}
-        on:click={() => setLanguage('zh-CN')}>{T('app.langZh')}</button>
-    </span>
-    {#if !showMobileChrome}
-      <button type="button" class="btn secondary" on:click={openGraph}>{T('app.graph')}</button>
-      <button type="button" class="btn secondary" on:click={openAbout}>{T('app.about')}</button>
     {/if}
     {#each $toolbarEntries as p (p.id)}
       <button
@@ -778,7 +1058,58 @@
         on:click={() => p.run?.()}
       >{p.label}</button>
     {/each}
-  </div>
+    </div>
+
+    <div class="titlebar-status">
+      <button
+        type="button"
+        class="nav-icon"
+        class:active={graphOpen}
+        aria-label={T('activity.graph')}
+        title={T('activity.graph')}
+        on:click={openGraph}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.2" fill="currentColor" /><circle cx="18" cy="8" r="2.2" fill="currentColor" /><circle cx="9" cy="18" r="2.2" fill="currentColor" /><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M8 7.1 16 8.9M10.3 16.4 15.8 9.6M6.7 8.3 8.6 16" /></svg>
+      </button>
+      <button
+        type="button"
+        class="nav-icon"
+        class:active={consoleOpen}
+        aria-label={T('activity.console')}
+        title={T('activity.console')}
+        on:click={() => (consoleOpen = !consoleOpen)}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2m0 2v10h16V7zm3 3 3 2.5L7 15l-1.2-1.3L7.3 12 5.8 10.3zm5.2 3.4H18V15h-5.8z" /></svg>
+      </button>
+      <button
+        type="button"
+        class="nav-icon"
+        class:active={inspectorOpen}
+        aria-label={T('app.toggleInspector')}
+        title={T('app.toggleInspector')}
+        on:click={() => (inspectorOpen = !inspectorOpen)}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16v16H4zm2 2v12h9V6zm11 0v12h2V6z" /></svg>
+      </button>
+      <button
+        type="button"
+        class="nav-icon"
+        class:active={settingsOpen}
+        aria-label={T('activity.settings')}
+        title={T('activity.settings')}
+        on:click={openSettings}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.4 13.5a7.8 7.8 0 0 0 .1-1.5 7.8 7.8 0 0 0-.1-1.5l2-1.5-2-3.4-2.4 1a7 7 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A7 7 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0-.1 1.5 7.8 7.8 0 0 0 .1 1.5l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a7 7 0 0 0 2.6-1.5l2.4 1 2-3.4zM12 15.2A3.2 3.2 0 1 1 12 8.8a3.2 3.2 0 0 1 0 6.4z" /></svg>
+      </button>
+      <span class="vault-chip" title={notesRoot}>{vaultBasename(notesRoot)}</span>
+      {#if lastFileEvent}
+        <span class="event" title={lastFileEvent}>{T('app.indexed')}</span>
+      {/if}
+      {#if !aiReachable}
+        <span class="ai-offline-pill" role="status">{T('app.aiOffline')}</span>
+      {/if}
+    </div>
+  </header>
 
   {#if selectedIds.length > 0}
     <div class="bulk-bar" role="toolbar" aria-label={T('app.multiSelect')}>
@@ -786,65 +1117,6 @@
       <button type="button" class="btn secondary sm" on:click={copySelectedMarkdown}>{T('app.copyText')}</button>
       <button type="button" class="btn secondary sm" on:click={clearSelection}>{T('app.clear')}</button>
     </div>
-  {/if}
-
-  {#if aboutOpen}
-    <div
-      class="about-backdrop"
-      role="presentation"
-      transition:fade={{ duration: 160 }}
-      on:click|self={() => (aboutOpen = false)}
-    >
-      <div
-        class="about-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="about-title"
-        transition:fly={{ y: 16, duration: 220, easing: cubicOut }}
-      >
-        <div class="about-brand" aria-hidden="true">
-          <div class="about-logo">D</div>
-        </div>
-        <h2 id="about-title">{T('app.title')}</h2>
-        <p class="about-ver">{appVersion || 'v1.4.6'}</p>
-        <p class="about-copy">
-          {T('app.aboutBody')}
-        </p>
-        <div class="about-actions">
-          <button
-            type="button"
-            class="btn secondary"
-            disabled={healthBusy}
-            on:click={() => runHealthReset()}
-          >{T('app.healthReset')}</button>
-          <button type="button" class="btn secondary" on:click={() => (aboutOpen = false)}>{T('app.close')}</button>
-        </div>
-      </div>
-    </div>
-  {/if}
-
-  {#if graphOpen}
-    <section
-      class="graph-panel"
-      in:fly={{ y: 14, duration: 240, easing: cubicOut }}
-      out:fade={{ duration: 160 }}
-    >
-      <div class="graph-head">
-        <h2>{T('app.pageGraph')}</h2>
-        <div class="graph-head-actions">
-          <label class="graph-semantic-toggle">
-            <input
-              type="checkbox"
-              bind:checked={graphSemanticOn}
-              on:change={() => toggleSemanticGraph()}
-            />
-            <span>{T('app.graphSemantic')}</span>
-          </label>
-          <button type="button" class="btn secondary sm" on:click={() => (graphOpen = false)}>{T('app.close')}</button>
-        </div>
-      </div>
-      <PageGraph graph={graphData} semanticEdges={graphSemanticEdges} semanticOn={graphSemanticOn} />
-    </section>
   {/if}
 
   {#if err}
@@ -860,11 +1132,125 @@
     ></div>
   {/if}
 
-  <div class="layout-grid" data-mobile-panel={mobilePanel}>
-  <div class="col-related-wrap col-gallery">
-    <SemanticRelated {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
-  </div>
+  <div
+    class="layout-grid"
+    class:pages-hidden={!pagesOpen}
+    class:inspector-hidden={!inspectorOpen}
+    data-mobile-panel={mobilePanel}
+  >
+  <aside class="vault-browser col-pages" aria-label={T('app.vaultBrowser')}>
+    <div class="vault-browser-head">
+      <div>
+        <h2>{T('activity.files')}</h2>
+      </div>
+      <div class="vault-actions" role="toolbar" aria-label={T('activity.files')}>
+        <button type="button" class="mini-btn" on:click={() => (paletteOpen = true)} title={T('app.search')} aria-label={T('app.search')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m20 20-4.2-4.2M18 10.8a7.2 7.2 0 1 1-14.4 0 7.2 7.2 0 0 1 14.4 0Z" /></svg>
+        </button>
+        <button type="button" class="mini-btn" on:click={openNewPageDialog} title={T('app.newNote')} aria-label={T('app.newNote')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3h9l5 5v13H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2m8 2v4h4zM9 13v2h3v3h2v-3h3v-2h-3v-3h-2v3z" /></svg>
+        </button>
+        <button type="button" class="mini-btn" on:click={() => loadVaultPages()} title={T('app.refreshPages')} aria-label={T('app.refreshPages')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.7 6.3A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h8V3z" /></svg>
+        </button>
+        <button type="button" class="mini-btn" on:click={() => (pagesOpen = false)} title={T('app.collapsePanel')} aria-label={T('app.collapsePanel')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 5h10v2H7zm3.8 4.2 1.4 1.4L10.8 12l1.4 1.4-1.4 1.4L8 12zm4.2 0L17.8 12 15 14.8l-1.4-1.4L15.2 12l-1.6-1.4zM7 17h10v2H7z" /></svg>
+        </button>
+      </div>
+    </div>
+    <input
+      class="page-filter"
+      bind:value={pageFilter}
+      placeholder={T('app.filterFiles')}
+      autocomplete="off"
+      spellcheck="false"
+    />
+    {#if visibleRecentPaths.length}
+      <section class="page-section" aria-label={T('app.recentPages')}>
+        <h3>{T('app.recentPages')}</h3>
+        <div class="page-list compact">
+          {#each visibleRecentPaths as rel (rel)}
+            <button
+              type="button"
+              class="page-row"
+              class:current={rel === pagePath}
+              on:click={() => {
+                mobilePanel = 'outline'
+                void loadPage(rel)
+              }}
+            >
+              <span class="page-dot" aria-hidden="true"></span>
+              <span class="page-name">{pageTitle(rel)}</span>
+            </button>
+          {/each}
+        </div>
+      </section>
+    {/if}
+    <section class="page-section page-section-fill" aria-label={T('app.allFiles')}>
+      <h3>{T('app.allFiles')}</h3>
+      {#if pagesLoading}
+        <p class="nav-muted">{T('app.filesLoading')}</p>
+      {:else if !filteredVaultFiles.length}
+        <p class="nav-muted">{T('app.noFiles')}</p>
+      {:else}
+        <div class="page-list">
+          {#each filteredVaultFiles as file (file.path)}
+            <button
+              type="button"
+              class="page-row"
+              class:active={isMarkdownFile(file) && file.path === pagePath}
+              class:external={!isMarkdownFile(file)}
+              on:click={() => openVaultEntry(file)}
+              on:dblclick={() => openVaultEntry(file)}
+            >
+              <span class="page-icon file-kind kind-{file.kind || 'other'}" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 3h9l5 5v13H6zM14 4.5V9h4.5" opacity="0.85" /></svg>
+              </span>
+              <span class="page-copy">
+                <span class="page-name">{fileTitle(file)}</span>
+                {#if pageFolder(file.path)}
+                  <span class="page-folder">{pageFolder(file.path)}</span>
+                {/if}
+              </span>
+              {#if fileKindLabel(file)}
+                <span class="file-ext">{fileKindLabel(file)}</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </section>
+    <div class="vault-footer">
+      <button type="button" class="footer-icon" on:click={() => (pagesOpen = false)} aria-label={T('app.collapsePanel')} title={T('app.collapsePanel')}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m15.4 6.4 1.4 1.4-4.2 4.2 4.2 4.2-1.4 1.4L9 12z" /></svg>
+      </button>
+      <span class="vault-footer-name" title={notesRoot}>{vaultBasename(notesRoot)}</span>
+      <span class="vault-footer-count">{vaultFiles.length || vaultPages.length}</span>
+    </div>
+  </aside>
 
+  {#if graphOpen}
+  <section class="col-main graph-workspace">
+    <div class="graph-view-head">
+      <div>
+        <h2>{T('app.pageGraph')}</h2>
+        <p>{graphData.nodes.length} {T('app.pages')} · {graphData.edges.length} {T('graph.links')}</p>
+      </div>
+      <div class="graph-head-actions">
+        <label class="graph-semantic-toggle">
+          <input
+            type="checkbox"
+            bind:checked={graphSemanticOn}
+            on:change={() => toggleSemanticGraph()}
+          />
+          <span>{T('app.graphSemantic')}</span>
+        </label>
+        <button type="button" class="btn secondary sm" on:click={() => (graphOpen = false)}>{T('app.close')}</button>
+      </div>
+    </div>
+    <PageGraph graph={graphData} semanticEdges={graphSemanticEdges} semanticOn={graphSemanticOn} />
+  </section>
+  {:else}
   <section class="col-main outliner-panel">
     <h2>{T('app.outline')}</h2>
     {#if pageLoading}
@@ -910,6 +1296,7 @@
       {/each}
     {/if}
     </section>
+  {/if}
 
   <aside class="dv-sidebar col-side" aria-label={T('sidebar.aria')}>
     <div class="side-tabs" role="tablist" aria-label={T('sidebar.tablist')}>
@@ -928,6 +1315,17 @@
         type="button"
         role="tab"
         class="side-tab"
+        class:active={sideTab === 'related'}
+        aria-selected={sideTab === 'related'}
+        id="tab-related"
+        on:click={() => (sideTab = 'related')}
+      >
+        {T('sidebar.tabRelated')}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="side-tab"
         class:active={sideTab === 'ai'}
         aria-selected={sideTab === 'ai'}
         id="tab-ai"
@@ -939,10 +1337,12 @@
     <div
       class="side-panel"
       role="tabpanel"
-      aria-labelledby={sideTab === 'backlinks' ? 'tab-backlinks' : 'tab-ai'}
+      aria-labelledby={sideTab === 'backlinks' ? 'tab-backlinks' : sideTab === 'related' ? 'tab-related' : 'tab-ai'}
     >
       {#if sideTab === 'backlinks'}
         <Backlinks {notesRoot} {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
+      {:else if sideTab === 'related'}
+        <SemanticRelated {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
       {:else}
         <AIChatPanel {pagePath} />
       {/if}
@@ -966,9 +1366,8 @@
     </aside>
   {/if}
 
-  <p class="hint">
-        {T('app.hint')}
-  </p>
+  <WorkspaceConsole {notesRoot} open={consoleOpen} onClose={() => (consoleOpen = false)} />
+  </section>
 </main>
 
 {#if showMobileChrome}
@@ -996,9 +1395,9 @@
     <button
       type="button"
       class="fab-btn fab-primary"
-      on:click={openOrCreate}
-      aria-label={T('app.ensurePage')}
-      title={T('app.ensurePage')}
+      on:click={openNewPageDialog}
+      aria-label={T('app.newNote')}
+      title={T('app.newNote')}
     >
       <svg class="fab-ico" viewBox="0 0 24 24" aria-hidden="true"
         ><path
@@ -1014,10 +1413,10 @@
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'outline' && !graphOpen && !aboutOpen}
+    class:active={mobilePanel === 'outline' && !graphOpen && !settingsOpen}
     on:click={() => {
       graphOpen = false
-      aboutOpen = false
+      settingsOpen = false
       mobilePanel = 'outline'
     }}
   >
@@ -1031,30 +1430,30 @@
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'related' && !graphOpen && !aboutOpen}
+    class:active={mobilePanel === 'pages' && !graphOpen && !settingsOpen}
     on:click={() => {
       graphOpen = false
-      aboutOpen = false
-      mobilePanel = 'related'
+      settingsOpen = false
+      mobilePanel = 'pages'
     }}
   >
     <span class="mobile-tab-ico" aria-hidden="true">
       <svg viewBox="0 0 24 24"
         ><path
           fill="currentColor"
-          d="M12 2l3 6 6 .9-4.5 4.4L18 20l-6-3.2L6 20l1.5-6.7L3 8.9 9 8z"
+          d="M4 4h16v3H4V4zm0 5h16v3H4V9zm0 5h11v3H4v-3zm0 5h8v2H4v-2z"
         /></svg
       >
     </span>
-    <span class="mobile-tab-lbl">{T('app.mobileNavRelated')}</span>
+    <span class="mobile-tab-lbl">{T('app.mobileNavPages')}</span>
   </button>
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'side' && !graphOpen && !aboutOpen}
+    class:active={mobilePanel === 'side' && !graphOpen && !settingsOpen}
     on:click={() => {
       graphOpen = false
-      aboutOpen = false
+      settingsOpen = false
       mobilePanel = 'side'
     }}
   >
@@ -1075,7 +1474,7 @@
     aria-label={T('app.mobileNavGraph')}
     title={T('app.mobileNavGraph')}
     on:click={() => {
-      aboutOpen = false
+      settingsOpen = false
       void openGraph()
     }}
   >
@@ -1100,12 +1499,12 @@
   <button
     type="button"
     class="mobile-tab-btn mobile-tab-iconish"
-    class:active={aboutOpen}
-    aria-label={T('app.mobileNavAbout')}
-    title={T('app.mobileNavAbout')}
+    class:active={settingsOpen}
+    aria-label={T('app.mobileNavSettings')}
+    title={T('app.mobileNavSettings')}
     on:click={() => {
       graphOpen = false
-      void openAbout()
+      void openSettings()
     }}
   >
     <span class="mobile-tab-ico" aria-hidden="true">
@@ -1116,7 +1515,7 @@
         /></svg
       >
     </span>
-    <span class="mobile-tab-lbl">{T('app.mobileNavAbout')}</span>
+    <span class="mobile-tab-lbl">{T('app.mobileNavSettings')}</span>
   </button>
 </nav>
 
@@ -1128,27 +1527,101 @@
   onClose={() => (paletteOpen = false)}
 />
 
+{#if newPageDialogOpen}
+  <div
+    class="dialog-backdrop"
+    role="presentation"
+    on:click|self={() => (newPageDialogOpen = false)}
+  >
+    <form
+      class="new-note-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-note-title"
+      on:submit|preventDefault={submitNewPage}
+    >
+      <div class="dialog-head">
+        <h2 id="new-note-title">{T('app.newNote')}</h2>
+        <button type="button" class="dialog-close" aria-label={T('app.close')} on:click={() => (newPageDialogOpen = false)}>
+          ×
+        </button>
+      </div>
+      <label class="new-note-field">
+        <span>{T('app.newPagePrompt')}</span>
+        <input
+          bind:this={newPageInput}
+          bind:value={newPagePath}
+          placeholder={T('app.newPageDefault')}
+          autocomplete="off"
+          spellcheck="false"
+          on:keydown={(e) => {
+            if (e.key === 'Escape') newPageDialogOpen = false
+          }}
+        />
+      </label>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-btn" on:click={() => (newPageDialogOpen = false)}>{T('app.cancel')}</button>
+        <button type="submit" class="dialog-btn primary" disabled={!newPagePath.trim()}>{T('app.create')}</button>
+      </div>
+    </form>
+  </div>
+{/if}
+
+<SettingsDialog
+  open={settingsOpen}
+  {appVersion}
+  {theme}
+  localeCode={$locale}
+  {aiReachable}
+  {notesRoot}
+  {healthBusy}
+  onClose={() => (settingsOpen = false)}
+  onSetLanguage={(code) => setLanguage(code)}
+  onToggleTheme={() => toggleTheme()}
+  onHealthReset={() => runHealthReset()}
+/>
+
 <ToastStack />
 
 <style>
   :global(html) {
-    background: transparent;
-    --dv-fg: #e8e8ec;
-    --dv-muted: rgba(255, 255, 255, 0.55);
-    --dv-border: rgba(255, 255, 255, 0.12);
-    --dv-input: #121216;
-    --dv-panel: rgba(28, 28, 34, 0.96);
+    background: var(--dv-app-bg);
+    --dv-fg: #d9dce4;
+    --dv-muted: rgba(217, 220, 228, 0.58);
+    --dv-border: rgba(255, 255, 255, 0.1);
+    --dv-input: #151821;
+    --dv-panel: #1a1d26;
+    --dv-app-bg: #101218;
+    --dv-rail-bg: #0b0d12;
+    --dv-titlebar: #151821;
+    --dv-surface: #161a22;
+    --dv-surface-2: #1b202a;
+    --dv-editor: #171b24;
+    --dv-tool-window: #10131a;
+    --dv-accent: #7aa2f7;
+    --dv-accent-2: #65c89b;
+    --dv-danger: #f7768e;
     --dv-hit-hover: rgba(255, 255, 255, 0.06);
     --dv-toast-bg: rgba(30, 30, 36, 0.96);
     --dv-toast-border: rgba(255, 255, 255, 0.12);
   }
 
   :global(html[data-theme='light']) {
-    --dv-fg: #141414;
-    --dv-muted: rgba(0, 0, 0, 0.5);
-    --dv-border: rgba(0, 0, 0, 0.12);
-    --dv-input: #ffffff;
-    --dv-panel: rgba(255, 255, 255, 0.94);
+    --dv-fg: #1f2328;
+    --dv-muted: rgba(31, 35, 40, 0.56);
+    --dv-border: rgba(31, 35, 40, 0.14);
+    --dv-input: #fbfbfc;
+    --dv-panel: #ffffff;
+    --dv-app-bg: #eef1f5;
+    --dv-rail-bg: #e9edf3;
+    --dv-titlebar: #f7f8fa;
+    --dv-surface: #f5f6f8;
+    --dv-surface-2: #ffffff;
+    --dv-editor: #ffffff;
+    --dv-tool-window: #f5f6f8;
+    --dv-accent: #6f4fd8;
+    --dv-accent-2: #16865a;
+    --dv-danger: #c2415b;
     --dv-hit-hover: rgba(0, 0, 0, 0.05);
     --dv-toast-bg: rgba(255, 252, 248, 0.98);
     --dv-toast-border: rgba(0, 0, 0, 0.1);
@@ -1158,12 +1631,13 @@
     margin: 0;
     min-height: 100vh;
     min-height: 100dvh;
-    background: transparent;
+    background: var(--dv-app-bg);
     color: var(--dv-fg);
-    font-family: var(--dv-font, var(--dv-font-sans, 'Inter', system-ui, sans-serif));
-    font-size: 15px;
-    line-height: 1.55;
+    font-family: var(--dv-font, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Segoe UI', sans-serif);
+    font-size: 13px;
+    line-height: 1.45;
     -webkit-font-smoothing: antialiased;
+    overflow: hidden;
   }
 
   @keyframes dv-reindex-pulse {
@@ -1179,16 +1653,6 @@
   .breadcrumbs.index-pulse {
     border-radius: 8px;
     animation: dv-reindex-pulse 0.9s ease-in-out 2;
-  }
-
-  .lang-toolbar {
-    display: inline-flex;
-    gap: 4px;
-    margin: 0 2px;
-  }
-  .lang-btn.active {
-    border-color: rgba(120, 160, 255, 0.45);
-    background: rgba(120, 160, 255, 0.12);
   }
 
   .skeleton-stack {
@@ -1280,10 +1744,6 @@
   main[data-chrome-mode='tablet-master'] .toolbar {
     margin-top: 14px;
   }
-  main[data-chrome-mode='tablet-master'] .top h1 {
-    font-size: 1.62rem;
-    line-height: 1.22;
-  }
   main[data-chrome-mode='phone-portrait'] .top {
     min-height: unset;
     padding-bottom: 4px;
@@ -1325,6 +1785,102 @@
     -webkit-backdrop-filter: blur(2px);
     backdrop-filter: blur(2px);
   }
+  .dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: color-mix(in srgb, #000 28%, transparent);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+  }
+  .new-note-dialog {
+    width: min(420px, calc(100vw - 40px));
+    border-radius: 8px;
+    border: 1px solid var(--dv-border);
+    background: var(--dv-panel);
+    color: var(--dv-fg);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+    padding: 14px;
+  }
+  .dialog-head {
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .dialog-head h2 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 650;
+    letter-spacing: 0;
+  }
+  .dialog-close {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dv-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .dialog-close:hover {
+    background: color-mix(in srgb, var(--dv-fg) 7%, transparent);
+    color: var(--dv-fg);
+  }
+  .new-note-field {
+    display: grid;
+    gap: 6px;
+    color: var(--dv-muted);
+    font-size: 0.76rem;
+  }
+  .new-note-field input {
+    width: 100%;
+    min-height: 34px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    border: 1px solid var(--dv-border);
+    background: var(--dv-input);
+    color: var(--dv-fg);
+    padding: 7px 9px;
+    font: inherit;
+    font-size: 0.84rem;
+  }
+  .new-note-field input:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--dv-accent) 38%, var(--dv-border));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--dv-accent) 13%, transparent);
+  }
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .dialog-btn {
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 6px;
+    border: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+    color: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .dialog-btn.primary {
+    border-color: color-mix(in srgb, var(--dv-accent) 35%, var(--dv-border));
+    background: color-mix(in srgb, var(--dv-accent) 18%, transparent);
+  }
+  .dialog-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
   .hamburger-btn {
     flex-shrink: 0;
   }
@@ -1335,14 +1891,14 @@
     }
     main[data-chrome-mode='tablet-master'] .layout-grid {
       display: grid;
-      grid-template-columns: minmax(196px, 22%) minmax(280px, 1fr) minmax(236px, 28%);
+      grid-template-columns: minmax(220px, 260px) minmax(360px, 1fr) minmax(280px, 340px);
       gap: 14px;
       align-items: start;
     }
-    main[data-chrome-mode='tablet-master'] .layout-grid .col-related-wrap :global(.semantic-related) {
+    main[data-chrome-mode='tablet-master'] .layout-grid .dv-sidebar {
       margin-top: 0;
     }
-    main[data-chrome-mode='tablet-master'] .layout-grid .dv-sidebar {
+    main[data-chrome-mode='tablet-master'] .layout-grid .vault-browser {
       margin-top: 0;
     }
     main[data-chrome-mode='tablet-master'] .layout-grid .col-main.outliner-panel {
@@ -1358,19 +1914,19 @@
       padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px))
         calc(12px + 56px + max(env(safe-area-inset-bottom, 0px), 12px)) max(12px, env(safe-area-inset-right, 0px));
     }
-    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='outline'] .col-related-wrap,
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='outline'] .col-pages,
     main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='outline'] .col-side {
       display: none;
     }
-    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='related'] .col-main,
-    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='related'] .col-side {
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='pages'] .col-main,
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='pages'] .col-side {
       display: none;
     }
     main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='side'] .col-main,
-    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='side'] .col-related-wrap {
+    main.layout:not([data-chrome-mode='tablet-master']) .layout-grid[data-mobile-panel='side'] .col-pages {
       display: none;
     }
-    main.layout:not([data-chrome-mode='tablet-master']) .mobile-tabbar {
+    .mobile-tabbar {
       display: flex;
       position: fixed;
       z-index: 60;
@@ -1388,7 +1944,7 @@
       -webkit-backdrop-filter: blur(10px);
       backdrop-filter: blur(10px);
     }
-    main.layout:not([data-chrome-mode='tablet-master']) .mobile-tab-btn {
+    .mobile-tab-btn {
       flex: 1;
       min-width: 0;
       min-height: 48px;
@@ -1407,12 +1963,9 @@
       gap: 2px;
       line-height: 1.15;
     }
-    main.layout:not([data-chrome-mode='tablet-master']) .mobile-tab-btn.active {
+    .mobile-tab-btn.active {
       border-color: rgba(120, 160, 255, 0.45);
       background: rgba(80, 120, 255, 0.14);
-    }
-    .top h1 {
-      font-size: 1.35rem;
     }
     .toolbar {
       flex-direction: column;
@@ -1456,19 +2009,10 @@
     opacity: 0.95;
     font-weight: 500;
   }
-  .top h1 {
-    margin: 0 0 4px;
-    font-size: 1.5rem;
-    font-weight: 650;
-  }
-  .meta,
   .event {
     margin: 0;
     font-size: 0.85rem;
     opacity: 0.75;
-  }
-  .event code {
-    font-size: 0.8rem;
   }
   .toolbar {
     display: flex;
@@ -1490,19 +2034,6 @@
     flex: 1 1 200px;
     min-width: 140px;
     max-width: min(360px, 42vw);
-  }
-  .icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 48px;
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-  .icon-btn .ico {
-    width: 22px;
-    height: 22px;
-    display: block;
   }
   .ai-offline-pill {
     display: inline-block;
@@ -1551,6 +2082,194 @@
     color: #f87171;
     font-size: 0.9rem;
   }
+  .vault-browser {
+    margin-top: 20px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-fg) 3%, transparent);
+    min-height: 240px;
+    max-height: calc(100vh - 180px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .vault-browser-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .vault-browser h2,
+  .page-section h3 {
+    margin: 0;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.58;
+    font-weight: 650;
+  }
+  .mini-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    border: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+    color: inherit;
+  }
+  .mini-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+  .page-filter {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--dv-border);
+    background: var(--dv-input);
+    color: inherit;
+    font: inherit;
+    font-size: 0.88rem;
+  }
+  .page-section {
+    min-width: 0;
+  }
+  .page-section-fill {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .page-section h3 {
+    margin-bottom: 8px;
+  }
+  .page-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+  .page-list.compact {
+    max-height: 180px;
+  }
+  .page-row {
+    width: 100%;
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    min-width: 0;
+  }
+  .page-row:hover {
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+  }
+  .page-row:focus {
+    outline: none;
+  }
+  .page-row:focus-visible {
+    background: color-mix(in srgb, var(--dv-fg) 7%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dv-fg) 13%, transparent);
+  }
+  .page-row.current,
+  .page-row.active {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--dv-fg) 9%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dv-fg) 7%, transparent);
+    color: color-mix(in srgb, var(--dv-fg) 96%, var(--dv-muted));
+  }
+  .page-row.current:focus-visible,
+  .page-row.active:focus-visible {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dv-fg) 12%, transparent);
+  }
+  .page-row.external {
+    color: color-mix(in srgb, var(--dv-fg) 84%, var(--dv-muted));
+  }
+  .page-icon {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    color: color-mix(in srgb, var(--dv-fg) 62%, transparent);
+  }
+  .page-icon svg {
+    width: 17px;
+    height: 17px;
+    display: block;
+  }
+  .file-kind.kind-office {
+    color: color-mix(in srgb, #3a7bd5 55%, var(--dv-muted));
+  }
+  .file-kind.kind-pdf {
+    color: color-mix(in srgb, #cf4f45 58%, var(--dv-muted));
+  }
+  .file-kind.kind-image {
+    color: color-mix(in srgb, #4f8d62 58%, var(--dv-muted));
+  }
+  .file-kind.kind-cad {
+    color: color-mix(in srgb, #9a7a2d 58%, var(--dv-muted));
+  }
+  .page-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex: 0 0 6px;
+    background: color-mix(in srgb, var(--dv-accent) 72%, transparent);
+  }
+  .page-copy {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .page-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.86rem;
+    line-height: 1.25;
+  }
+  .page-folder {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.68rem;
+    opacity: 0.45;
+    line-height: 1.25;
+  }
+  .file-ext {
+    margin-left: auto;
+    flex: 0 0 auto;
+    max-width: 56px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+    color: var(--dv-muted);
+    font-size: 0.62rem;
+    line-height: 1.35;
+  }
+  .nav-muted {
+    margin: 0;
+    padding: 8px 2px;
+    font-size: 0.82rem;
+    opacity: 0.52;
+  }
   .outliner-panel {
     margin-top: 20px;
     padding: 16px;
@@ -1592,69 +2311,6 @@
     main.layout:not([data-chrome-mode='tablet-master']) .btn.sm {
       min-height: 48px;
     }
-  }
-  .about-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 80;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: rgba(0, 0, 0, 0.45);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-  }
-  .about-card {
-    max-width: 380px;
-    width: 100%;
-    padding: 20px 22px;
-    border-radius: 12px;
-    border: 1px solid var(--dv-border);
-    background: var(--dv-panel);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  }
-  .about-card h2 {
-    margin: 0 0 4px;
-    font-size: 1.25rem;
-  }
-  .about-brand {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 10px;
-  }
-  .about-logo {
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
-    display: grid;
-    place-items: center;
-    font-size: 2rem;
-    font-weight: 700;
-    color: #ecfeff;
-    background:
-      radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.28), transparent 45%),
-      linear-gradient(145deg, #0ea5e9, #fb7185);
-    box-shadow: 0 10px 24px rgba(6, 58, 100, 0.35);
-  }
-  .about-ver {
-    margin: 0 0 12px;
-    font-family: var(--dv-font-mono, 'JetBrains Mono', monospace);
-    font-size: 0.85rem;
-    opacity: 0.65;
-  }
-  .about-copy {
-    margin: 0 0 16px;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    opacity: 0.85;
-  }
-  .about-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-    justify-content: flex-end;
   }
   .mobile-fab-stack {
     position: fixed;
@@ -1698,26 +2354,24 @@
   .outliner-panel :global(textarea[data-block-id]) {
     scroll-margin-bottom: max(96px, calc(56px + env(safe-area-inset-bottom, 0px)));
   }
-  .graph-panel {
-    margin-top: 16px;
-    padding: 14px 16px 8px;
-    border-radius: 10px;
-    border: 1px solid var(--dv-border);
-    background: color-mix(in srgb, var(--dv-fg) 4%, transparent);
-  }
-  .graph-head {
+  .graph-view-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    margin-bottom: 4px;
+    min-height: 40px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--dv-border);
   }
-  .graph-head h2 {
+  .graph-view-head h2 {
     margin: 0;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    opacity: 0.55;
+    font-size: 0.86rem;
+    font-weight: 520;
+  }
+  .graph-view-head p {
+    margin: 2px 0 0;
+    color: var(--dv-muted);
+    font-size: 0.7rem;
   }
   .graph-head-actions {
     display: flex;
@@ -1735,11 +2389,6 @@
     cursor: pointer;
     user-select: none;
   }
-  .hint {
-    margin-top: 24px;
-    font-size: 0.8rem;
-    opacity: 0.5;
-  }
   .plugin-tb {
     font-size: 0.85rem;
   }
@@ -1749,25 +2398,34 @@
     border-radius: 10px;
     border: 1px solid var(--dv-border);
     background: color-mix(in srgb, var(--dv-fg) 4%, transparent);
+    max-height: calc(100vh - 180px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
   .side-tabs {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
     margin-bottom: 12px;
+    flex-shrink: 0;
   }
   .side-tab {
-    flex: 1;
-    min-height: 48px;
-    padding: 8px 10px;
+    min-width: 0;
+    min-height: 40px;
+    padding: 7px 8px;
     border-radius: 8px;
     border: 1px solid var(--dv-border);
     background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
     color: inherit;
-    font-size: 0.8rem;
+    font-size: 0.74rem;
     font-weight: 500;
     cursor: pointer;
     opacity: 0.65;
     touch-action: manipulation;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .side-tab.active {
     opacity: 1;
@@ -1775,7 +2433,9 @@
     background: rgba(80, 120, 255, 0.1);
   }
   .side-panel {
+    flex: 1;
     min-height: 120px;
+    overflow-y: auto;
   }
   .plugin-sidebar {
     margin-top: 20px;
@@ -1801,5 +2461,633 @@
     font-size: 0.88rem;
     line-height: 1.45;
     white-space: pre-wrap;
+  }
+
+  .layout.ide-shell {
+    max-width: none;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-rows: 38px minmax(0, 1fr);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--dv-accent) 4%, transparent), transparent 220px),
+      var(--dv-app-bg);
+    overflow: hidden;
+  }
+  .layout.ide-shell::before {
+    content: '';
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 0;
+    background: color-mix(in srgb, var(--dv-titlebar) 94%, transparent);
+    border-bottom: 1px solid var(--dv-border);
+    pointer-events: none;
+  }
+  .workspace-stage {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .activity-rail {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: max(7px, env(safe-area-inset-top, 0px)) 0 max(7px, env(safe-area-inset-bottom, 0px));
+    background: var(--dv-rail-bg);
+  }
+  .rail-btn {
+    position: relative;
+    width: 40px;
+    height: 37px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--dv-muted);
+    cursor: pointer;
+  }
+  .rail-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 2px;
+    height: 18px;
+    border-radius: 0 2px 2px 0;
+    transform: translateY(-50%) scaleY(0.35);
+    opacity: 0;
+    background: linear-gradient(180deg, transparent, var(--dv-accent), transparent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--dv-accent) 42%, transparent);
+    transition:
+      opacity 0.16s ease,
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .rail-btn:hover {
+    color: var(--dv-fg);
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+  }
+  .rail-btn.active {
+    color: var(--dv-accent);
+  }
+  .rail-btn.active::before {
+    opacity: 1;
+    transform: translateY(-50%) scaleY(1);
+  }
+  .rail-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .rail-spacer {
+    flex: 1;
+  }
+  .rail-pro.active,
+  .rail-pro:hover {
+    color: var(--dv-accent-2);
+  }
+  .app-titlebar {
+    height: 38px;
+    min-height: 38px;
+    padding: 0 7px 0 72px;
+    display: grid;
+    grid-template-columns: minmax(210px, 330px) minmax(160px, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    border-bottom: 1px solid var(--dv-border);
+    background: color-mix(in srgb, var(--dv-titlebar) 94%, transparent);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    --wails-draggable: drag;
+  }
+  main[data-chrome-mode='tablet-master'] .app-titlebar {
+    min-height: 38px;
+    padding-bottom: 0;
+  }
+  .titlebar-left {
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .nav-icon {
+    --wails-draggable: no-drag;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dv-muted);
+    cursor: pointer;
+  }
+  .nav-icon:hover {
+    border-color: color-mix(in srgb, var(--dv-fg) 10%, transparent);
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+    color: var(--dv-fg);
+  }
+  .nav-icon.active {
+    color: var(--dv-accent);
+    background: color-mix(in srgb, var(--dv-accent) 11%, transparent);
+  }
+  .nav-icon.primary {
+    color: color-mix(in srgb, var(--dv-accent) 88%, var(--dv-fg));
+    background: color-mix(in srgb, var(--dv-accent) 12%, transparent);
+  }
+  .nav-icon:disabled {
+    opacity: 0.32;
+    cursor: default;
+  }
+  .nav-icon:disabled:hover {
+    border-color: transparent;
+    background: transparent;
+    color: var(--dv-muted);
+  }
+  .nav-icon svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+  }
+  .tab-strip {
+    min-width: 0;
+    display: flex;
+    align-items: end;
+    height: 100%;
+    padding-top: 4px;
+  }
+  .doc-tab {
+    --wails-draggable: no-drag;
+    min-width: 0;
+    max-width: 170px;
+    height: 33px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    border: 1px solid var(--dv-border);
+    border-bottom-color: color-mix(in srgb, var(--dv-editor) 92%, var(--dv-border));
+    border-radius: 6px 6px 0 0;
+    background: var(--dv-editor);
+    color: var(--dv-fg);
+    font: inherit;
+    font-size: 0.83rem;
+  }
+  .doc-tab span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .doc-tab-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--dv-accent-2);
+    flex: 0 0 7px;
+  }
+  .titlebar-status {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+  }
+  .titlebar-status .event {
+    margin: 0;
+    color: var(--dv-muted);
+    font-size: 0.72rem;
+    opacity: 0.88;
+  }
+  .titlebar-status .ai-offline-pill {
+    margin: 0;
+  }
+  .vault-chip {
+    max-width: 150px;
+    margin-left: 5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--dv-fg);
+    font-size: 0.78rem;
+    opacity: 0.9;
+  }
+  .top-commandbar.toolbar {
+    min-height: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  main[data-chrome-mode='tablet-master'] .top-commandbar.toolbar,
+  .top-commandbar.toolbar.tool-ribbon {
+    margin-top: 0;
+    padding-bottom: 0;
+    gap: 5px;
+  }
+  .top-commandbar .breadcrumbs {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    min-height: 26px;
+    margin: 0;
+    padding: 0 7px;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    overflow: hidden;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dv-muted);
+    text-align: center;
+    opacity: 1;
+    font-size: 0.75rem;
+    letter-spacing: 0;
+  }
+  .top-commandbar .breadcrumbs .crumb {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .top-commandbar .breadcrumbs .vault {
+    flex: 0 1 auto;
+  }
+  .path-input {
+    --wails-draggable: no-drag;
+    min-height: 26px;
+    height: 26px;
+    min-width: 120px;
+    max-width: 260px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 0.78rem;
+    font-family: var(--dv-font, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif);
+  }
+  main[data-chrome-mode='tablet-master'] .toolbar.tool-ribbon .path-input {
+    flex: 1 1 160px;
+    min-width: 120px;
+    max-width: min(260px, 30vw);
+  }
+  .command-icon {
+    width: 26px;
+    height: 26px;
+    flex-basis: 26px;
+  }
+  .top-commandbar .path-input,
+  .top-commandbar .command-icon {
+    display: none;
+  }
+  .btn {
+    --wails-draggable: no-drag;
+    min-height: 30px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--dv-accent) 14%, transparent);
+    font-size: 0.84rem;
+    cursor: pointer;
+  }
+  .btn.secondary {
+    background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+  }
+  .plugin-tb {
+    --wails-draggable: no-drag;
+    min-height: 26px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 0.74rem;
+    white-space: nowrap;
+  }
+  .btn:hover,
+  .mini-btn:hover,
+  .side-tab:hover,
+  .page-row:hover {
+    border-color: color-mix(in srgb, var(--dv-accent) 28%, var(--dv-border));
+  }
+  .bulk-bar,
+  .err,
+  .plugin-sidebar {
+    margin: 8px 8px 0;
+    flex-shrink: 0;
+  }
+  .layout-grid {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  main[data-chrome-mode='tablet-master'] .layout-grid {
+    display: grid;
+    grid-template-columns: minmax(248px, 304px) minmax(420px, 1fr) minmax(286px, 340px);
+    gap: 0;
+    align-items: stretch;
+    padding: 0;
+  }
+  main[data-chrome-mode='tablet-master'] .layout-grid.pages-hidden {
+    grid-template-columns: minmax(420px, 1fr) minmax(300px, 360px);
+  }
+  main[data-chrome-mode='tablet-master'] .layout-grid.inspector-hidden {
+    grid-template-columns: minmax(230px, 280px) minmax(420px, 1fr);
+  }
+  main[data-chrome-mode='tablet-master'] .layout-grid.pages-hidden.inspector-hidden {
+    grid-template-columns: minmax(420px, 1fr);
+  }
+  .layout-grid.pages-hidden .col-pages,
+  .layout-grid.inspector-hidden .col-side {
+    display: none;
+  }
+  .vault-browser,
+  .outliner-panel,
+  .graph-workspace,
+  .dv-sidebar {
+    margin-top: 0;
+    border-radius: 0;
+    border: 0;
+    background: var(--dv-surface-2);
+    box-shadow: none;
+  }
+  .vault-browser,
+  .dv-sidebar {
+    padding: 0;
+    max-height: none;
+    min-height: 0;
+    height: 100%;
+  }
+  .vault-browser {
+    background: var(--dv-surface);
+    border-right: 1px solid var(--dv-border);
+    gap: 0;
+  }
+  .vault-browser-head {
+    min-height: 34px;
+    padding: 0 6px 0 10px;
+    border-bottom: 1px solid var(--dv-border);
+  }
+  .vault-actions {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+  }
+  .vault-browser h2,
+  .page-section h3,
+  .outliner-panel h2,
+  .graph-view-head h2,
+  .plugin-card-title {
+    letter-spacing: 0.04em;
+    font-size: 0.68rem;
+  }
+  .vault-browser h2 {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.84rem;
+    opacity: 0.82;
+  }
+  .mini-btn {
+    width: 26px;
+    height: 26px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--dv-muted);
+  }
+  .mini-btn:hover {
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+    color: var(--dv-fg);
+  }
+  .mini-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+  .page-filter {
+    width: calc(100% - 16px);
+    min-height: 28px;
+    margin: 7px 8px 6px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+  }
+  .page-section {
+    padding: 0 6px 7px;
+  }
+  .page-section h3 {
+    margin: 0;
+    padding: 6px 7px 4px;
+  }
+  .page-list {
+    gap: 0;
+    padding-right: 0;
+  }
+  .page-list.compact {
+    max-height: 130px;
+  }
+  .page-row {
+    min-height: 26px;
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+  .page-name {
+    font-size: 0.82rem;
+  }
+  .page-folder {
+    font-size: 0.63rem;
+  }
+  .vault-footer {
+    min-height: 34px;
+    margin-top: auto;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    border-top: 1px solid var(--dv-border);
+    color: var(--dv-muted);
+    font-size: 0.74rem;
+  }
+  .footer-icon {
+    width: 25px;
+    height: 25px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .footer-icon:hover {
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+    color: var(--dv-fg);
+  }
+  .footer-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+  .vault-footer-name {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .vault-footer-count {
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--dv-fg) 6%, transparent);
+    font-size: 0.68rem;
+  }
+  .outliner-panel {
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px 16px;
+    background: var(--dv-editor);
+    border-right: 1px solid var(--dv-border);
+  }
+  .graph-workspace {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--dv-editor);
+    border-right: 1px solid var(--dv-border);
+  }
+  .graph-workspace :global(.graph-wrap) {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .outliner-panel :global(.row) {
+    border-radius: 4px;
+  }
+  .outliner-panel :global(.ta) {
+    border-radius: 5px;
+    border-color: transparent;
+    background: transparent;
+    color: color-mix(in srgb, var(--dv-fg) 92%, var(--dv-muted));
+    font-family: var(--dv-font-editor, var(--dv-font, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif));
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .outliner-panel :global(.ta:focus) {
+    border-color: color-mix(in srgb, var(--dv-fg) 18%, var(--dv-border));
+    background: color-mix(in srgb, var(--dv-fg) 3.5%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--dv-accent) 16%, transparent);
+  }
+  .dv-sidebar {
+    background: var(--dv-surface);
+  }
+  .side-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    padding: 2px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--dv-fg) 5%, transparent);
+  }
+  .side-tab {
+    min-height: 28px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    font-size: 0.7rem;
+  }
+  .side-tab.active {
+    background: var(--dv-panel);
+    border-color: transparent;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  }
+  .ai-offline-pill {
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    color: var(--dv-danger);
+    background: color-mix(in srgb, var(--dv-danger) 10%, transparent);
+    border-color: color-mix(in srgb, var(--dv-danger) 24%, transparent);
+  }
+  @media (max-width: 899px) {
+    :global(body) {
+      overflow: auto;
+    }
+    .layout.ide-shell {
+      display: block;
+      width: 100%;
+      min-height: 100dvh;
+      height: auto;
+      padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-left, 0px))
+        calc(12px + 56px + max(env(safe-area-inset-bottom, 0px), 12px)) max(12px, env(safe-area-inset-right, 0px));
+      overflow: visible;
+    }
+    .workspace-stage {
+      overflow: visible;
+      border-left: 0;
+    }
+    .activity-rail {
+      display: none;
+    }
+    .app-titlebar {
+      height: auto;
+      min-height: 0;
+      padding: 0;
+      display: block;
+      border: 0;
+      background: transparent;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    .titlebar-left,
+    .titlebar-status {
+      display: none;
+    }
+    .top-commandbar.toolbar {
+      height: auto;
+      min-height: 0;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--dv-border);
+      background: color-mix(in srgb, var(--dv-surface) 94%, var(--dv-panel));
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      overflow: visible;
+    }
+    .top-commandbar .breadcrumbs {
+      flex: 1 0 100%;
+      max-width: none;
+      margin-bottom: 0;
+      border: 0;
+      background: transparent;
+    }
+    .top-commandbar .path-input {
+      display: block;
+      flex: 1 1 180px;
+      max-width: none;
+      min-height: 38px;
+      height: 38px;
+      font-size: 16px;
+    }
+    .top-commandbar .command-icon {
+      display: grid;
+    }
   }
 </style>

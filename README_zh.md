@@ -2,14 +2,14 @@
 
 English | [中文](README_zh.md)
 
-[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault?v=1.4.2)](https://github.com/cndingbo2030/dingovault/releases)
-[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg?v=1.4.2)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault?v=1.4.2)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
+[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault?v=1.5.0)](https://github.com/cndingbo2030/dingovault/releases)
+[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg?v=1.5.0)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault?v=1.5.0)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
 [![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
-[![License](https://img.shields.io/github/license/cndingbo2030/dingovault?v=1.4.2)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
-[![Stars](https://img.shields.io/github/stars/cndingbo2030/dingovault?v=1.4.2)](https://github.com/cndingbo2030/dingovault/stargazers)
-[![Forks](https://img.shields.io/github/forks/cndingbo2030/dingovault?v=1.4.2)](https://github.com/cndingbo2030/dingovault/forks)
-<!-- badge-refresh-2026-04-09 -->
+[![License](https://img.shields.io/github/license/cndingbo2030/dingovault?v=1.5.0)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/cndingbo2030/dingovault?v=1.5.0)](https://github.com/cndingbo2030/dingovault/stargazers)
+[![Forks](https://img.shields.io/github/forks/cndingbo2030/dingovault?v=1.5.0)](https://github.com/cndingbo2030/dingovault/forks)
+<!-- badge-refresh-2026-06-03 -->
 
 **基于 Go 的高性能、本地优先大纲笔记系统，支持 SaaS 同步。**
 
@@ -30,6 +30,16 @@ Dingovault 以 Markdown 块（block）为核心，提供 FTS5 全文搜索、双
 **数据在磁盘上也要「军事级」保密。** 通过 **`DINGO_MASTER_KEY`** 可启用 **AES-256-GCM** 静态加密，磁盘丢失不等于明文泄露；自托管 SaaS 时配合 **JWT** 鉴权，多用户场景也能收紧边界。
 
 **AI 不必把大脑上传到云端。** 优先对接 **Ollama** 等本地端点：行内辅助、仓库感知对话、可选向量嵌入都可以留在 **本机 GPU/CPU** 上完成，让「RAG」不必等于「把每一段笔记发给第三方模型」。
+
+## v1.5.0 — Obsidian 级桌面工作区
+
+详见 **[CHANGELOG.md](CHANGELOG.md)** 与 **[v1.5.0 发布说明](docs/RELEASE_V1.5.0.md)**。
+
+- **桌面 UI：** 参考 Obsidian 与 JetBrains 的紧凑工作区：原生标题栏、活动栏、文件窗格、标签式当前文档、可折叠右侧栏、独立设置窗口与底部工作区终端。
+- **图谱：** 支持滚轮缩放、画布拖动、节点拖动、重置/缩放控制、悬停强调与更适合大仓库的标签密度。
+- **文件：** 文件浏览器支持 Markdown，并可列出 Office/WPS、PDF、图片、CAD/DWG 等文件；Markdown 在应用内打开，其他类型交给系统默认应用。
+- **编辑稳定性：** 更克制的焦点样式、更少干扰的标签建议、更清晰的双链显示，并在索引变更导致块 ID 失效时自动刷新文档。
+- **AI 面板：** 反向链接、语义相关与 AI 对话侧栏完成密度与空状态优化。
 
 ## v1.4.2 — AGPL-3.0、GHCR 镜像与 npm SDK 占位包
 
@@ -130,7 +140,7 @@ xattr -cr /Applications/Dingovault.app
 每个 **`v*`** 标签会构建并推送 **SaaS 服务端** 镜像：
 
 ```bash
-docker pull ghcr.io/cndingbo2030/dingovault:v1.4.2
+docker pull ghcr.io/cndingbo2030/dingovault:v1.5.0
 docker run --rm -p 12030:12030 -e DINGO_JWT_SECRET='至少16字符的密钥' -v dingovault-data:/data ghcr.io/cndingbo2030/dingovault:latest
 ```
 

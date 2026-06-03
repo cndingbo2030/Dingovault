@@ -8,10 +8,11 @@ import (
 	"flag"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
-	"time"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/cndingbo2030/dingovault/internal/ai"
 	"github.com/cndingbo2030/dingovault/internal/bridge"
@@ -150,14 +151,33 @@ func openDesktopStore(cfg config.Config) storage.Provider {
 		store = rs
 		log.Printf("cloud mode: API %s (local vault path from config)", cfg.CloudAPIURL)
 	} else {
-		dbPath := flag.Lookup("db").Value.String()
+		dbPath, err := resolveDesktopDBPath(flag.Lookup("db").Value.String())
+		if err != nil {
+			log.Fatalf("database path: %v", err)
+		}
+		if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+			log.Fatalf("database directory: %v", err)
+		}
 		st, err := storage.OpenSQLite(dbPath)
 		if err != nil {
 			log.Fatalf("open database: %v", err)
 		}
+		log.Printf("local database: %s", dbPath)
 		store = st
 	}
 	return store
+}
+
+func resolveDesktopDBPath(dbPath string) (string, error) {
+	dbPath = strings.TrimSpace(dbPath)
+	if dbPath == "" || dbPath == "dingovault.db" {
+		dir, err := config.Dir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(dir, "dingovault.db"), nil
+	}
+	return dbPath, nil
 }
 
 func closeProvider(store storage.Provider) {
@@ -214,6 +234,14 @@ func runDesktopApp(cfg config.Config, app *bridge.App, idx *scanner.Indexer, not
 		// Slight transparency so macOS vibrancy / translucency shows through the webview.
 		BackgroundColour: &options.RGBA{R: 18, G: 18, B: 22, A: 235},
 		Mac: &mac.Options{
+			TitleBar: &mac.TitleBar{
+				TitlebarAppearsTransparent: true,
+				HideTitle:                  true,
+				HideTitleBar:               false,
+				FullSizeContent:            true,
+				UseToolbar:                 false,
+				HideToolbarSeparator:       true,
+			},
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  true,
 		},
