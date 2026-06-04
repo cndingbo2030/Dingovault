@@ -44,6 +44,10 @@
   export let onSwipeTodo = async () => {}
   /** @type {(id: string) => Promise<void>} Mobile: swipe left on rail, clear block after parent confirmation. */
   export let onSwipeClear = async () => {}
+  /** @type {(id: string, text: string) => Promise<void>} Explicitly run this block as a terminal command. */
+  export let onRunCommand = async () => {}
+  /** @type {(id: string, text: string) => Promise<void>} Open a terminal scoped to this node's context. */
+  export let onOpenTerminalContext = async () => {}
 
   let local = node.content
   let saveTimer = 0
@@ -302,6 +306,16 @@
     slashOpen = false
   }
 
+  async function runBlockCommand() {
+    await flush()
+    await onRunCommand(node.id, local)
+  }
+
+  async function openTerminalContext() {
+    await flush()
+    await onOpenTerminalContext(node.id, local)
+  }
+
   /** @param {KeyboardEvent} e */
   function onKeydown(e) {
     if (slashOpen && e.key === 'Escape') {
@@ -453,6 +467,14 @@
       >⋮</span>
     </div>
     <div class="edit">
+    <div class="row-actions" aria-label={T('outline.terminalActions')}>
+      <button type="button" title={T('outline.runCommand')} aria-label={T('outline.runCommand')} on:mousedown={(e) => e.preventDefault()} on:click={() => runBlockCommand()}>
+        ▶
+      </button>
+      <button type="button" title={T('outline.openTerminalHere')} aria-label={T('outline.openTerminalHere')} on:mousedown={(e) => e.preventDefault()} on:click={() => openTerminalContext()}>
+        $
+      </button>
+    </div>
     <textarea
       bind:this={taEl}
       class="ta"
@@ -570,6 +592,8 @@
       {onReorderBefore}
       {onSwipeTodo}
       {onSwipeClear}
+      {onRunCommand}
+      {onOpenTerminalContext}
     />
   {/each}
 {/if}
@@ -690,6 +714,40 @@
     position: relative;
     flex: 1;
     min-width: 0;
+  }
+  .row-actions {
+    position: absolute;
+    z-index: 3;
+    top: 3px;
+    right: 5px;
+    display: inline-flex;
+    gap: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+  }
+  .row:hover .row-actions,
+  .row:focus-within .row-actions,
+  .row.selected .row-actions {
+    opacity: 0.88;
+    pointer-events: auto;
+  }
+  .row-actions button {
+    min-width: 22px;
+    height: 22px;
+    border: 1px solid var(--dv-border, rgba(255, 255, 255, 0.12));
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--dv-panel, #fff) 90%, transparent);
+    color: var(--dv-muted, rgba(0, 0, 0, 0.55));
+    font-family: var(--dv-font-mono, ui-monospace, monospace);
+    font-size: 0.68rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .row-actions button:hover {
+    color: var(--dv-fg, #fff);
+    border-color: color-mix(in srgb, var(--dv-accent, #6f4fd8) 30%, var(--dv-border));
+    background: color-mix(in srgb, var(--dv-accent, #6f4fd8) 10%, var(--dv-panel, #fff));
   }
   .ta {
     width: 100%;

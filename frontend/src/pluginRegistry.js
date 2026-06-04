@@ -59,7 +59,7 @@ export function exposePluginAPI() {
   if (typeof window === 'undefined') return
   const w = /** @type {DingoWindow} */ (window)
   w.__DINGOVAULT__ = {
-    version: '1.5.0',
+    version: '1.6.0',
     registerToolbarButton,
     registerSidebarSection
   }

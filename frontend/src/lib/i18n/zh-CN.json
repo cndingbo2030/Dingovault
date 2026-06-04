@@ -45,6 +45,7 @@
     "aboutBody": "本地优先大纲工具：Markdown 块、全文检索与可选云端同步。详见仓库 README 的安装、SaaS 模式与安全说明。",
     "close": "关闭",
     "pageGraph": "页面图谱",
+    "pageMindMap": "页面思维导图",
     "graphSemantic": "语义关联",
     "multiSelect": "多选",
     "copyText": "复制文本",
@@ -67,6 +68,7 @@
     "mobileNavPages": "页面",
     "mobileNavSide": "链接与 AI",
     "mobileNavGraph": "图谱",
+    "mobileNavMindMap": "导图",
     "mobileNavAbout": "关于",
     "mobileNavSettings": "设置",
     "aiOffline": "AI 离线",
@@ -80,6 +82,7 @@
     "aria": "活动栏",
     "files": "文件",
     "graph": "图谱",
+    "mindMap": "页面思维导图",
     "console": "终端",
     "ai": "AI",
     "pro": "工作区",
@@ -96,6 +99,24 @@
     "forces": "力导向",
     "links": "条链接",
     "semantic": "语义"
+  },
+  "mindmap": {
+    "aria": "思维导图视图",
+    "toolbar": "思维导图控制",
+    "reset": "重置",
+    "exportSvg": "导出 SVG",
+    "exportPng": "导出 PNG",
+    "copyMarkdown": "复制 Markdown 大纲",
+    "blocks": "个块",
+    "empty": "此页还没有大纲块",
+    "copied": "已复制 Markdown 大纲",
+    "exported": "已导出 {format}",
+    "labelsHidden": "放大可显示更多标签",
+    "editNode": "编辑 {label}",
+    "toggleCollapse": "折叠或展开 {label}",
+    "addChildTo": "给 {label} 添加子节点",
+    "runCommand": "运行 {label} 的命令",
+    "openTerminalHere": "在 {label} 上下文打开终端"
   },
   "settings": {
     "options": "选项",
@@ -148,6 +169,14 @@
     "quickAria": "终端快捷操作",
     "placeholder": "在当前仓库运行命令…",
     "run": "运行",
+    "terminal": "终端",
+    "sessions": "终端会话",
+    "newTerminal": "新建终端",
+    "closeSession": "关闭终端会话",
+    "noTerminal": "还没有终端会话",
+    "guardrail": "块内容是数据，不是可信代码。Dingovault 只会在用户显式点击后运行命令，非明显只读命令会再次确认。",
+    "waveOpened": "已在当前仓库打开 Wave。",
+    "waveMissing": "未安装 Wave，或没有找到 Wave 启动器。",
     "running": "运行中",
     "runningOutput": "运行中…",
     "timeout": "超时",
@@ -159,6 +188,10 @@
       "wails": "构建",
       "wave": "Wave"
     }
+  },
+  "terminal": {
+    "confirmRun": "运行这条命令，并把终端输出追加到该块下面？\n\n{command}",
+    "resultAppended": "已追加终端结果（退出码 {exitCode}）。"
   },
   "palette": {
     "aria": "命令面板",
@@ -202,7 +235,10 @@
     "aiCancel": "取消",
     "tagHint": "推荐标签：",
     "tagSuggestAria": "标签建议",
-    "aiConnectionLost": "连接已断开 — 请确认本地 AI 服务已启动后再试。"
+    "aiConnectionLost": "连接已断开 — 请确认本地 AI 服务已启动后再试。",
+    "terminalActions": "终端操作",
+    "runCommand": "将块作为命令运行",
+    "openTerminalHere": "在节点上下文打开终端"
   },
   "aiChat": {
     "aria": "AI 助手",

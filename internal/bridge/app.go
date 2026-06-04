@@ -19,6 +19,7 @@ import (
 	"github.com/cndingbo2030/dingovault/internal/locale"
 	"github.com/cndingbo2030/dingovault/internal/storage"
 	"github.com/cndingbo2030/dingovault/internal/tenant"
+	"github.com/cndingbo2030/dingovault/internal/terminal"
 	"github.com/cndingbo2030/dingovault/internal/version"
 )
 
@@ -35,6 +36,9 @@ type App struct {
 
 	lanMu   sync.Mutex
 	stopLAN func()
+
+	terminalMu      sync.Mutex
+	terminalManager *terminal.Manager
 
 	pageMu       sync.Mutex
 	pageCacheAbs string
@@ -405,6 +409,22 @@ func (a *App) InsertBlockAfter(blockID, initialText string) error {
 	return err
 }
 
+// InsertChildBlock appends a new direct child under the given Markdown list block.
+func (a *App) InsertChildBlock(parentID, initialText string) error {
+	if a.graph == nil {
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
+	}
+	ctx := context.Background()
+	if a.ctx != nil {
+		ctx = a.ctx
+	}
+	err := a.graph.InsertChildBlock(ctx, parentID, initialText)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
+}
+
 // ReorderBlockBefore moves movingID immediately before beforeID among sibling blocks in the same file.
 func (a *App) ReorderBlockBefore(movingID, beforeID string) error {
 	if a.graph == nil {
@@ -415,6 +435,22 @@ func (a *App) ReorderBlockBefore(movingID, beforeID string) error {
 		ctx = a.ctx
 	}
 	err := a.graph.ReorderSiblingBefore(ctx, movingID, beforeID)
+	if err == nil {
+		a.invalidatePageCache()
+	}
+	return err
+}
+
+// MoveBlockUnder moves a block subtree to become the last child of a target block in the same Markdown file.
+func (a *App) MoveBlockUnder(movingID, newParentID string) error {
+	if a.graph == nil {
+		return fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
+	}
+	ctx := context.Background()
+	if a.ctx != nil {
+		ctx = a.ctx
+	}
+	err := a.graph.MoveBlockUnder(ctx, movingID, newParentID)
 	if err == nil {
 		a.invalidatePageCache()
 	}

@@ -11,7 +11,8 @@ Core layers:
 2. **Parser + Graph Service**: transforms Markdown into block/page/link structures.
 3. **Storage Provider**: persists and queries index data (SQLite locally, remote provider for SaaS).
 4. **API/Bridge Surface**: Wails bridge for desktop and HTTP handlers for server mode.
-5. **Frontend (Svelte)**: consumes bridge/API and renders editor, graph, search, and operations.
+5. **Terminal Layer**: ephemeral PTY sessions for local execution inside the vault root.
+6. **Frontend (Svelte)**: consumes bridge/API and renders editor, graph, terminal, search, and operations.
 
 ## Data Flow
 
@@ -78,16 +79,49 @@ Current implementations:
 
 ## Desktop Workspace Architecture
 
-The v1.5.0 desktop shell is intentionally closer to an IDE than a marketing site. The UI is organized around reusable work surfaces:
+The current desktop shell is intentionally closer to an IDE than a marketing site. The UI is organized around reusable work surfaces:
 
 - **Activity rail**: primary mode switches for files, graph, console, AI, and settings.
 - **Files pane**: `ListVaultFiles` returns supported vault files with type metadata; Markdown routes to `GetPage`, while non-Markdown uses `OpenVaultFile` and the OS default handler.
 - **Editor pane**: block operations remain file-backed through graph service mutations (`UpdateBlock`, `InsertBlockAfter`, indent/outdent, slash operations, reorder).
 - **Inspector pane**: backlinks, semantically related blocks, and AI Chat share the current page context.
 - **Graph pane**: `GetWikiGraph` produces page-level nodes and links; the frontend applies force layout, pan, wheel zoom, hover emphasis, and node dragging.
-- **Workspace console**: bridge commands run inside the vault root with bounded output and tests around command execution.
+- **Workspace console**: keeps one-shot commands for quick checks, and hosts ephemeral PTY terminal blocks for interactive work.
 
 This keeps the desktop UI dense and operational while preserving Markdown files as the source of truth.
+
+## Terminal Layer and Thinking-Doing Loop
+
+Dingovault's terminal layer is intentionally local-first and ephemeral. Markdown remains the durable source of truth; terminal sessions are working surfaces.
+
+Backend:
+
+- `internal/terminal.Manager` owns PTY sessions created with `github.com/creack/pty`.
+- Session cwd is scoped to the vault root by default; vault-relative cwd values are resolved and paths that escape the root are rejected.
+- PTY output is streamed through Wails events:
+  - `terminal-session-started`,
+  - `terminal-output`,
+  - `terminal-exit`,
+  - `terminal-error`.
+- Wails bridge methods expose session start, stdin write, resize, close, and PTY-backed block command execution.
+- `RunVaultCommand` remains available for bounded one-shot quick commands.
+
+Frontend:
+
+- `frontend/src/Terminal.svelte` wraps `@xterm/xterm` and `@xterm/addon-fit`.
+- `WorkspaceConsole.svelte` treats terminal sessions as Wave-style blocks displayed as tabs. Sessions are not persisted and should not store secrets.
+- Quick commands still render as compact history cards beside the terminal area.
+- Wave Terminal interop is optional: `OpenInWave` detects `wave`/`waveterm` or macOS `open -a Wave`, then opens the vault cwd when available.
+
+Loop workflows:
+
+1. **Run block as command**: the user explicitly clicks a terminal action on an outline or mind-map node. Dingovault shows the exact command and confirms anything that is not a simple read-only command. The backend runs the command in a PTY, streams output to the console, and appends a child Markdown block with `source: terminal`, `exitCode`, `ranAt`, the command, and output.
+2. **Run in node context**: the user opens a terminal from an outline or mind-map node. The node text is treated as a possible path/project hint; otherwise the current page folder is used. The terminal opens scoped to that cwd without executing anything automatically.
+3. **Think -> restructure -> execute -> record**: users can plan in the outline, view/restructure the same page as a mind map, run selected execution steps in the console, then keep the result under the originating block so later graph/search/AI flows can reason over the outcome.
+
+Guardrail:
+
+- Block content is data, not trusted code. Dingovault never auto-executes a block during navigation, rendering, indexing, or mind-map layout. Execution requires a user click, and non-read-only commands require a confirmation containing the exact command text.
 
 ## Migration and Integrity
 

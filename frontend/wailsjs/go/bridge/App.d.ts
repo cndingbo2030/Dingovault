@@ -9,6 +9,8 @@ export function AIChat(arg1:string,arg2:string):Promise<string>;
 
 export function ApplySlashOp(arg1:string,arg2:string):Promise<void>;
 
+export function CloseTerminalSession(arg1:string):Promise<void>;
+
 export function CycleBlockTodo(arg1:string):Promise<void>;
 
 export function EnsurePage(arg1:string):Promise<void>;
@@ -41,6 +43,8 @@ export function IndentBlock(arg1:string):Promise<void>;
 
 export function InsertBlockAfter(arg1:string,arg2:string):Promise<void>;
 
+export function InsertChildBlock(arg1:string,arg2:string):Promise<void>;
+
 export function IsAIReachable():Promise<boolean>;
 
 export function ListLANSyncPeers():Promise<Array<bridge.LANPeerDTO>>;
@@ -51,7 +55,11 @@ export function ListVaultFiles():Promise<Array<bridge.VaultFileDTO>>;
 
 export function ListVaultPages():Promise<Array<string>>;
 
+export function MoveBlockUnder(arg1:string,arg2:string):Promise<void>;
+
 export function NotesRoot():Promise<string>;
+
+export function OpenInWave(arg1:string):Promise<bridge.WaveOpenResult>;
 
 export function OpenVaultFile(arg1:string):Promise<void>;
 
@@ -63,7 +71,13 @@ export function QueryBlocks(arg1:string):Promise<Array<domain.Block>>;
 
 export function ReorderBlockBefore(arg1:string,arg2:string):Promise<void>;
 
+export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
+
+export function ResolveTerminalCwd(arg1:string):Promise<string>;
+
 export function ResolveWikilink(arg1:string):Promise<string>;
+
+export function RunBlockCommand(arg1:string,arg2:string,arg3:string):Promise<bridge.TerminalCommandResultDTO>;
 
 export function RunVaultCommand(arg1:string):Promise<bridge.ConsoleCommandResult>;
 
@@ -83,6 +97,8 @@ export function StartAIInlineStream(arg1:string,arg2:string,arg3:string):Promise
 
 export function StartLANSyncAdvertise():Promise<string>;
 
+export function StartTerminalSession(arg1:string):Promise<bridge.TerminalSessionDTO>;
+
 export function Startup(arg1:context.Context):Promise<void>;
 
 export function StopLANSyncAdvertise():Promise<void>;
@@ -94,3 +110,5 @@ export function SyncVaultS3():Promise<void>;
 export function SyncVaultWebDAV():Promise<void>;
 
 export function UpdateBlock(arg1:string,arg2:string):Promise<void>;
+
+export function WriteTerminalInput(arg1:string,arg2:string):Promise<void>;

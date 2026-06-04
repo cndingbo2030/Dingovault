@@ -10,6 +10,10 @@ export function ApplySlashOp(arg1, arg2) {
   return window['go']['bridge']['App']['ApplySlashOp'](arg1, arg2);
 }
 
+export function CloseTerminalSession(arg1) {
+  return window['go']['bridge']['App']['CloseTerminalSession'](arg1);
+}
+
 export function CycleBlockTodo(arg1) {
   return window['go']['bridge']['App']['CycleBlockTodo'](arg1);
 }
@@ -74,6 +78,10 @@ export function InsertBlockAfter(arg1, arg2) {
   return window['go']['bridge']['App']['InsertBlockAfter'](arg1, arg2);
 }
 
+export function InsertChildBlock(arg1, arg2) {
+  return window['go']['bridge']['App']['InsertChildBlock'](arg1, arg2);
+}
+
 export function IsAIReachable() {
   return window['go']['bridge']['App']['IsAIReachable']();
 }
@@ -94,8 +102,16 @@ export function ListVaultPages() {
   return window['go']['bridge']['App']['ListVaultPages']();
 }
 
+export function MoveBlockUnder(arg1, arg2) {
+  return window['go']['bridge']['App']['MoveBlockUnder'](arg1, arg2);
+}
+
 export function NotesRoot() {
   return window['go']['bridge']['App']['NotesRoot']();
+}
+
+export function OpenInWave(arg1) {
+  return window['go']['bridge']['App']['OpenInWave'](arg1);
 }
 
 export function OpenVaultFile(arg1) {
@@ -118,8 +134,20 @@ export function ReorderBlockBefore(arg1, arg2) {
   return window['go']['bridge']['App']['ReorderBlockBefore'](arg1, arg2);
 }
 
+export function ResizeTerminal(arg1, arg2, arg3) {
+  return window['go']['bridge']['App']['ResizeTerminal'](arg1, arg2, arg3);
+}
+
+export function ResolveTerminalCwd(arg1) {
+  return window['go']['bridge']['App']['ResolveTerminalCwd'](arg1);
+}
+
 export function ResolveWikilink(arg1) {
   return window['go']['bridge']['App']['ResolveWikilink'](arg1);
+}
+
+export function RunBlockCommand(arg1, arg2, arg3) {
+  return window['go']['bridge']['App']['RunBlockCommand'](arg1, arg2, arg3);
 }
 
 export function RunVaultCommand(arg1) {
@@ -158,6 +186,10 @@ export function StartLANSyncAdvertise() {
   return window['go']['bridge']['App']['StartLANSyncAdvertise']();
 }
 
+export function StartTerminalSession(arg1) {
+  return window['go']['bridge']['App']['StartTerminalSession'](arg1);
+}
+
 export function Startup(arg1) {
   return window['go']['bridge']['App']['Startup'](arg1);
 }
@@ -180,4 +212,8 @@ export function SyncVaultWebDAV() {
 
 export function UpdateBlock(arg1, arg2) {
   return window['go']['bridge']['App']['UpdateBlock'](arg1, arg2);
+}
+
+export function WriteTerminalInput(arg1, arg2) {
+  return window['go']['bridge']['App']['WriteTerminalInput'](arg1, arg2);
 }

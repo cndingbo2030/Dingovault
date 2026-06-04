@@ -2,6 +2,17 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
+## v1.6.0 — Mind map, PTY terminal, and thinking-doing loop (2026-06-04)
+
+- Added a live page-level Mind Map view that renders the current outline tree instead of the vault-wide relationship graph.
+- Mind Map nodes support pan, wheel zoom, collapse, branch colors, inline editing, and child creation.
+- Dragging a Mind Map node onto another re-parents the Markdown subtree and refreshes from disk.
+- Added SVG/PNG export plus copy-as-Markdown-outline for the current page map.
+- Added backend move/child insertion primitives with focused graph service tests.
+- Added a real PTY terminal layer with streamed Wails events, xterm.js frontend blocks, resize, stdin, and session close.
+- Added explicit outline/mind-map actions to run a block as a terminal command and append the result as a child Markdown block.
+- Added optional Wave Terminal handoff that opens the current vault when Wave is installed and degrades cleanly when absent.
+
 ## v1.5.0 — Obsidian-grade desktop workspace, graph, AI, and files (2026-06-03)
 
 ### Desktop workspace

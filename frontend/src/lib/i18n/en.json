@@ -45,6 +45,7 @@
     "aboutBody": "Local-first outliner with Markdown blocks, FTS search, and optional cloud sync. See the repository README for setup, SaaS mode, and security notes.",
     "close": "Close",
     "pageGraph": "Page graph",
+    "pageMindMap": "Mind Map",
     "graphSemantic": "Semantic connections",
     "multiSelect": "Multi-select",
     "copyText": "Copy text",
@@ -67,6 +68,7 @@
     "mobileNavPages": "Pages",
     "mobileNavSide": "Links & AI",
     "mobileNavGraph": "Graph",
+    "mobileNavMindMap": "Mind Map",
     "mobileNavAbout": "About",
     "mobileNavSettings": "Settings",
     "aiOffline": "AI offline",
@@ -80,6 +82,7 @@
     "aria": "Activity bar",
     "files": "Files",
     "graph": "Graph",
+    "mindMap": "Mind Map",
     "console": "Console",
     "ai": "AI",
     "pro": "Workspace",
@@ -96,6 +99,24 @@
     "forces": "Forces",
     "links": "links",
     "semantic": "semantic"
+  },
+  "mindmap": {
+    "aria": "Mind map view",
+    "toolbar": "Mind map controls",
+    "reset": "Reset",
+    "exportSvg": "Export SVG",
+    "exportPng": "Export PNG",
+    "copyMarkdown": "Copy Markdown outline",
+    "blocks": "blocks",
+    "empty": "No outline blocks on this page",
+    "copied": "Markdown outline copied",
+    "exported": "Exported {format}",
+    "labelsHidden": "zoom in to show more labels",
+    "editNode": "Edit {label}",
+    "toggleCollapse": "Toggle branch for {label}",
+    "addChildTo": "Add child to {label}",
+    "runCommand": "Run command from {label}",
+    "openTerminalHere": "Open terminal at {label}"
   },
   "settings": {
     "options": "Options",
@@ -148,6 +169,14 @@
     "quickAria": "Console quick actions",
     "placeholder": "Run a command in this vault…",
     "run": "Run",
+    "terminal": "Terminal",
+    "sessions": "Terminal sessions",
+    "newTerminal": "New terminal",
+    "closeSession": "Close terminal session",
+    "noTerminal": "No terminal session yet",
+    "guardrail": "Block text is data, not trusted code. Dingovault only runs commands after an explicit click and confirmation for non-read-only commands.",
+    "waveOpened": "Wave opened at this vault.",
+    "waveMissing": "Wave is not installed or no Wave launcher was found.",
     "running": "Running",
     "runningOutput": "Running…",
     "timeout": "timeout",
@@ -159,6 +188,10 @@
       "wails": "Build",
       "wave": "Wave"
     }
+  },
+  "terminal": {
+    "confirmRun": "Run this command and append its terminal output under the block?\n\n{command}",
+    "resultAppended": "Terminal result appended (exit {exitCode})."
   },
   "palette": {
     "aria": "Command palette",
@@ -202,7 +235,10 @@
     "aiCancel": "Cancel",
     "tagHint": "Suggested tags:",
     "tagSuggestAria": "Tag suggestions",
-    "aiConnectionLost": "Connection lost — check that your AI server is running, then try again."
+    "aiConnectionLost": "Connection lost — check that your AI server is running, then try again.",
+    "terminalActions": "Terminal actions",
+    "runCommand": "Run block as command",
+    "openTerminalHere": "Open terminal in node context"
   },
   "aiChat": {
     "aria": "AI assistant",

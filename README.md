@@ -2,14 +2,14 @@
 
 [中文文档](README_zh.md) | English
 
-[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault?v=1.5.0)](https://github.com/cndingbo2030/dingovault/releases)
-[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg?v=1.5.0)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault?v=1.5.0)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
+[![Release](https://img.shields.io/github/v/release/cndingbo2030/dingovault?v=1.6.0)](https://github.com/cndingbo2030/dingovault/releases)
+[![Test](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml/badge.svg?v=1.6.0)](https://github.com/cndingbo2030/dingovault/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cndingbo2030/dingovault?v=1.6.0)](https://goreportcard.com/report/github.com/cndingbo2030/dingovault)
 [![Go mod](https://img.shields.io/github/go-mod/go-version/cndingbo2030/dingovault/main?label=go)](https://github.com/cndingbo2030/dingovault/blob/main/go.mod)
-[![License](https://img.shields.io/github/license/cndingbo2030/dingovault?v=1.5.0)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
-[![Stars](https://img.shields.io/github/stars/cndingbo2030/dingovault?v=1.5.0)](https://github.com/cndingbo2030/dingovault/stargazers)
-[![Forks](https://img.shields.io/github/forks/cndingbo2030/dingovault?v=1.5.0)](https://github.com/cndingbo2030/dingovault/forks)
-<!-- badge-refresh-2026-06-03 -->
+[![License](https://img.shields.io/github/license/cndingbo2030/dingovault?v=1.6.0)](https://github.com/cndingbo2030/dingovault/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/cndingbo2030/dingovault?v=1.6.0)](https://github.com/cndingbo2030/dingovault/stargazers)
+[![Forks](https://img.shields.io/github/forks/cndingbo2030/dingovault?v=1.6.0)](https://github.com/cndingbo2030/dingovault/forks)
+<!-- badge-refresh-2026-06-04 -->
 
 **High-performance, local-first outliner with SaaS sync, built in Go.**
 
@@ -33,15 +33,15 @@ Dingovault is a block-based Markdown vault: fast full-text search (FTS5), wikili
 
 ---
 
-## v1.5.0 — Obsidian-grade desktop workspace
+## v1.6.0 — Mind map and terminal thinking-doing loop
 
-**Details:** [CHANGELOG.md](CHANGELOG.md) and [release notes](docs/RELEASE_V1.5.0.md).
+**Details:** [CHANGELOG.md](CHANGELOG.md) and [release notes](docs/RELEASE_V1.6.0.md).
 
-- **Desktop UI:** compact Obsidian/JetBrains-inspired workspace with a native titlebar, activity rail, files pane, tab-like document header, collapsible inspector, standalone settings window, and integrated workspace console.
-- **Graph:** Obsidian-like page graph with wheel zoom, canvas panning, draggable nodes, reset/zoom controls, hover emphasis, and improved label density for larger vaults.
-- **Files:** vault browser now lists Markdown plus supported Office/WPS, PDF, image, and CAD/DWG-style files; Markdown opens in-app, other file types open through the OS default app.
-- **Editor stability:** quieter focus states, less intrusive tag suggestions, cleaner wikilink chips, and automatic recovery when stale block IDs appear after reindexing.
-- **AI panels:** denser backlinks, related-content, and AI Chat sidebars with clearer empty states and settings.
+- **Mind Map:** a live page-level mind map renders the same outline tree returned by `GetPage`, with pan, wheel zoom, collapsible branches, branch coloring, inline editing, child creation, drag re-parenting, SVG/PNG export, and Markdown outline copy.
+- **Terminal blocks:** the workspace console now includes real PTY-backed xterm.js sessions with streamed output, resize, stdin, multiple ephemeral terminal blocks, and quick one-shot command history.
+- **Thinking-doing loop:** run a selected outline or mind-map block as an explicit terminal command, then append stdout back into the Markdown page as a child block with terminal metadata.
+- **Wave interop:** optional cross-platform "Open in Wave" handoff opens the current vault in Wave Terminal when it is installed and degrades cleanly when absent.
+- **Release readiness:** backend graph/terminal tests, refreshed Wails bindings, updated architecture docs, and synchronized `1.6.0` desktop/frontend/Android version metadata.
 
 ## v1.4.2 — AGPL-3.0, GHCR image & npm SDK stub
 
@@ -334,7 +334,7 @@ Also see `project.meta.json`.
 On each **`v*`** tag, CI builds and pushes the **SaaS server** image:
 
 ```bash
-docker pull ghcr.io/cndingbo2030/dingovault:v1.5.0
+docker pull ghcr.io/cndingbo2030/dingovault:v1.6.0
 docker run --rm -p 12030:12030 -e DINGO_JWT_SECRET='your-secret-at-least-16-chars' -v dingovault-data:/data ghcr.io/cndingbo2030/dingovault:latest
 ```
 

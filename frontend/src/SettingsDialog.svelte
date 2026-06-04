@@ -93,7 +93,7 @@
             <div class="setting-row">
               <div>
                 <h3>{T('settings.version')}</h3>
-                <p>{appVersion || 'v1.5.0'}</p>
+                <p>{appVersion || 'v1.6.0'}</p>
               </div>
               <button type="button" class="setting-action">{T('settings.checkUpdates')}</button>
             </div>

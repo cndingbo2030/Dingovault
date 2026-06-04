@@ -164,6 +164,42 @@ export namespace bridge {
 	        this.s3Endpoint = source["s3Endpoint"];
 	    }
 	}
+	export class TerminalCommandResultDTO {
+	    sessionId: string;
+	    command: string;
+	    cwd: string;
+	    output: string;
+	    exitCode: number;
+	    durationMs: number;
+
+	    static createFrom(source: any = {}) {
+	        return new TerminalCommandResultDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.command = source["command"];
+	        this.cwd = source["cwd"];
+	        this.output = source["output"];
+	        this.exitCode = source["exitCode"];
+	        this.durationMs = source["durationMs"];
+	    }
+	}
+	export class TerminalSessionDTO {
+	    id: string;
+	    cwd: string;
+
+	    static createFrom(source: any = {}) {
+	        return new TerminalSessionDTO(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.cwd = source["cwd"];
+	    }
+	}
 	export class VaultFileDTO {
 	    path: string;
 	    name: string;
@@ -184,6 +220,22 @@ export namespace bridge {
 	        this.kind = source["kind"];
 	        this.size = source["size"];
 	        this.modifiedUnix = source["modifiedUnix"];
+	    }
+	}
+	export class WaveOpenResult {
+	    opened: boolean;
+	    command: string;
+	    message: string;
+
+	    static createFrom(source: any = {}) {
+	        return new WaveOpenResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.opened = source["opened"];
+	        this.command = source["command"];
+	        this.message = source["message"];
 	    }
 	}
 

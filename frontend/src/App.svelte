@@ -31,6 +31,8 @@
     GetWikiGraph,
     GetSemanticGraphEdges,
     ReorderBlockBefore,
+    MoveBlockUnder,
+    InsertChildBlock,
     GetAppVersion,
     GetLocale,
     SetLocale,
@@ -44,6 +46,7 @@
   import { locale, messages, tr, detectBrowserLocale, normalizeLocaleTag } from './lib/i18n/index.js'
   import OutlineNode from './OutlineNode.svelte'
   import PageGraph from './PageGraph.svelte'
+  import MindMap from './MindMap.svelte'
   import Backlinks from './Backlinks.svelte'
   import SemanticRelated from './SemanticRelated.svelte'
   import AIChatPanel from './AIChatPanel.svelte'
@@ -81,12 +84,15 @@
   /** @type {string[]} */
   let selectedIds = []
   let graphOpen = false
+  let mindMapOpen = false
   let settingsOpen = false
   let newPageDialogOpen = false
   let newPagePath = ''
   /** @type {HTMLInputElement | undefined} */
   let newPageInput
   let consoleOpen = false
+  /** @type {any} */
+  let consolePane
   let pagesOpen = true
   let inspectorOpen = true
   /** @type {'backlinks' | 'related' | 'ai'} */
@@ -187,7 +193,7 @@
     if (staleBlockRecovering) return true
     staleBlockRecovering = true
     try {
-      await loadPage(pagePath, { skipHistory: true, softNav: true })
+      await loadPage(pagePath, { skipHistory: true, softNav: true, keepGraph: graphOpen, keepMindMap: mindMapOpen })
       pushToast(T('app.blockRecovered'), 'info', 2400)
     } finally {
       staleBlockRecovering = false
@@ -344,6 +350,13 @@
     selectedIds = []
   }
 
+  /** @param {any[]} nodes */
+  function countOutlineBlocks(nodes) {
+    let total = 0
+    for (const node of nodes || []) total += 1 + countOutlineBlocks(node.children || [])
+    return total
+  }
+
   async function copySelectedMarkdown() {
     const lines = []
     for (const id of selectedIds) {
@@ -365,12 +378,22 @@
       graphData = await GetWikiGraph()
       graphSemanticEdges = []
       graphSemanticOn = false
+      mindMapOpen = false
       inspectorOpen = false
       consoleOpen = false
       graphOpen = true
     } catch (e) {
       notifyErr(e)
     }
+  }
+
+  function openMindMap() {
+    err = ''
+    graphOpen = false
+    mindMapOpen = true
+    inspectorOpen = false
+    consoleOpen = false
+    mobilePanel = 'outline'
   }
 
   async function toggleSemanticGraph() {
@@ -407,6 +430,103 @@
       await loadPage(pagePath)
     } catch (e) {
       await handleMutationError(e)
+    }
+  }
+
+  /** @param {string} id @param {string} text */
+  async function handleMindMapUpdate(id, text) {
+    err = ''
+    try {
+      await syncAllBlocksFromDOM()
+      await UpdateBlock(id, text)
+      await loadPage(pagePath, { skipHistory: true, softNav: true, keepMindMap: true })
+    } catch (e) {
+      await handleMutationError(e)
+    }
+  }
+
+  /** @param {string} movingId @param {string} parentId */
+  async function handleMindMapMoveUnder(movingId, parentId) {
+    if (!movingId || !parentId || movingId === parentId) return
+    err = ''
+    try {
+      await syncAllBlocksFromDOM()
+      await MoveBlockUnder(movingId, parentId)
+      await loadPage(pagePath, { skipHistory: true, softNav: true, keepMindMap: true })
+    } catch (e) {
+      await handleMutationError(e)
+    }
+  }
+
+  /** @param {string} parentId */
+  async function handleMindMapInsertChild(parentId) {
+    if (!parentId) return
+    err = ''
+    try {
+      await syncAllBlocksFromDOM()
+      await InsertChildBlock(parentId, '')
+      await loadPage(pagePath, { skipHistory: true, softNav: true, keepMindMap: true })
+    } catch (e) {
+      await handleMutationError(e)
+    }
+  }
+
+  /** @param {string} command */
+  function isPlainReadOnlyCommand(command) {
+    const cmd = command.trim()
+    return /^(pwd|ls\b|find\b|rg\b|grep\b|cat\b|head\b|tail\b|less\b|git\s+(status|diff|log|show|branch|rev-parse)\b)/.test(cmd)
+  }
+
+  /** @param {string} text */
+  function commandFromBlockText(text) {
+    return String(text || '')
+      .replace(/^`+|`+$/g, '')
+      .trim()
+  }
+
+  /** @param {string} text */
+  function cwdFromBlockText(text) {
+    const raw = String(text || '').trim()
+    const cleaned = raw
+      .replace(/^\s*[-*+]\s+/, '')
+      .replace(/^`+|`+$/g, '')
+      .replace(/^\[\[|\]\]$/g, '')
+      .trim()
+    if (/^(\.\/|\.\.\/|\/|[A-Za-z]:[\\/])/.test(cleaned)) return cleaned
+    if (/[\\/]/.test(cleaned)) return cleaned
+    return pageFolder(pagePath)
+  }
+
+  /** @param {string} id @param {string} text */
+  async function handleRunBlockCommand(id, text) {
+    const cmd = commandFromBlockText(text)
+    if (!cmd) return
+    if (!isPlainReadOnlyCommand(cmd)) {
+      const ok = window.confirm(T('terminal.confirmRun', { command: cmd }))
+      if (!ok) return
+    }
+    err = ''
+    consoleOpen = true
+    await tick()
+    try {
+      await syncAllBlocksFromDOM()
+      const result = await consolePane?.runBlockCommand?.(id, cmd, pageFolder(pagePath))
+      await loadPage(pagePath, { skipHistory: true, softNav: true, keepMindMap: mindMapOpen })
+      if (result) pushToast(T('terminal.resultAppended', { exitCode: result.exitCode }), result.exitCode === 0 ? 'info' : 'error')
+    } catch (e) {
+      await handleMutationError(e)
+    }
+  }
+
+  /** @param {string} _id @param {string} text */
+  async function handleOpenTerminalContext(_id, text) {
+    err = ''
+    consoleOpen = true
+    await tick()
+    try {
+      await consolePane?.startSessionForCwd?.(cwdFromBlockText(text))
+    } catch (e) {
+      notifyErr(e)
     }
   }
 
@@ -467,6 +587,10 @@
       graphOpen = false
       return true
     }
+    if (mindMapOpen) {
+      mindMapOpen = false
+      return true
+    }
     if (chromeMode === 'small-tablet' && sideSheetOpen) {
       sideSheetOpen = false
       return true
@@ -483,6 +607,10 @@
   function goBackPage() {
     if (graphOpen) {
       graphOpen = false
+      return
+    }
+    if (mindMapOpen) {
+      mindMapOpen = false
       return
     }
     if (navStack.length <= 1) return
@@ -646,7 +774,7 @@
 
   /**
    * @param {string} rel
-   * @param {{ focusBlockId?: string, caretOffset?: number, skipHistory?: boolean, replaceTop?: boolean, softNav?: boolean, keepGraph?: boolean }} [opts]
+   * @param {{ focusBlockId?: string, caretOffset?: number, skipHistory?: boolean, replaceTop?: boolean, softNav?: boolean, keepGraph?: boolean, keepMindMap?: boolean }} [opts]
    */
   async function loadPage(rel, opts) {
     const focusId = opts?.focusBlockId
@@ -654,6 +782,7 @@
     const skipHist = opts?.skipHistory
     const replaceTop = opts?.replaceTop
     if (!opts?.keepGraph) graphOpen = false
+    if (!opts?.keepMindMap) mindMapOpen = false
     const softNav = !!opts?.softNav && rel === pagePath && roots.length > 0
     if (!skipHist) {
       if (navStack.length === 0) {
@@ -928,6 +1057,16 @@
     <button
       type="button"
       class="rail-btn"
+      class:active={mindMapOpen}
+      aria-label={T('activity.mindMap')}
+      title={T('activity.mindMap')}
+      on:click={openMindMap}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="2.3" fill="currentColor" /><circle cx="13" cy="6" r="2.2" fill="currentColor" /><circle cx="13" cy="18" r="2.2" fill="currentColor" /><circle cx="20" cy="12" r="2.1" fill="currentColor" /><path fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" d="M7.5 10.7 11.1 7.4M7.5 13.3l3.6 3.3M15.1 7.4 18.2 11M15.1 16.6l3.1-3.6" /></svg>
+    </button>
+    <button
+      type="button"
+      class="rail-btn"
       class:active={consoleOpen}
       aria-label={T('activity.console')}
       title={T('activity.console')}
@@ -974,7 +1113,7 @@
       >
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H10l2 2h5.5A2.5 2.5 0 0 1 20 7.5v11A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5zM6.5 5A.5.5 0 0 0 6 5.5V8h12v-.5a.5.5 0 0 0-.5-.5h-6.33l-2-2zM6 10v8.5a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5V10z" /></svg>
       </button>
-      {#if graphOpen || navStack.length > 1}
+      {#if graphOpen || mindMapOpen || navStack.length > 1}
         <button
           type="button"
           class="nav-icon"
@@ -997,7 +1136,7 @@
       <div class="tab-strip" aria-label={T('app.openTabs')}>
         <button type="button" class="doc-tab active" title={pagePath}>
           <span class="doc-tab-dot" aria-hidden="true"></span>
-          <span>{graphOpen ? T('app.pageGraph') : pageTitle(pagePath)}</span>
+          <span>{graphOpen ? T('app.pageGraph') : mindMapOpen ? T('app.pageMindMap') : pageTitle(pagePath)}</span>
         </button>
       </div>
     </div>
@@ -1016,6 +1155,10 @@
     <nav class="breadcrumbs" class:index-pulse={indexPulse} aria-label={T('app.breadcrumb')}>
       {#if graphOpen}
         <span class="crumb current">{T('app.pageGraph')}</span>
+      {:else if mindMapOpen}
+        <span class="crumb vault">{vaultBasename(notesRoot)}</span>
+        <span class="sep" aria-hidden="true">›</span>
+        <span class="crumb current">{T('app.pageMindMap')}</span>
       {:else}
       <span class="crumb vault">{vaultBasename(notesRoot)}</span>
       {#if breadcrumbSegments.length > 1}
@@ -1070,6 +1213,16 @@
         on:click={openGraph}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.2" fill="currentColor" /><circle cx="18" cy="8" r="2.2" fill="currentColor" /><circle cx="9" cy="18" r="2.2" fill="currentColor" /><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M8 7.1 16 8.9M10.3 16.4 15.8 9.6M6.7 8.3 8.6 16" /></svg>
+      </button>
+      <button
+        type="button"
+        class="nav-icon"
+        class:active={mindMapOpen}
+        aria-label={T('activity.mindMap')}
+        title={T('activity.mindMap')}
+        on:click={openMindMap}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="2.1" fill="currentColor" /><circle cx="13" cy="6" r="2" fill="currentColor" /><circle cx="13" cy="18" r="2" fill="currentColor" /><circle cx="20" cy="12" r="1.9" fill="currentColor" /><path fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" d="M7.3 10.8 11 7.4M7.3 13.2l3.7 3.4M15 7.4 18.3 11M15 16.6l3.3-3.6" /></svg>
       </button>
       <button
         type="button"
@@ -1250,6 +1403,31 @@
     </div>
     <PageGraph graph={graphData} semanticEdges={graphSemanticEdges} semanticOn={graphSemanticOn} />
   </section>
+  {:else if mindMapOpen}
+  <section class="col-main graph-workspace mindmap-workspace">
+    <div class="graph-view-head">
+      <div>
+        <h2>{T('app.pageMindMap')}</h2>
+        <p>{pageTitle(pagePath)} · {countOutlineBlocks(roots)} {T('mindmap.blocks')}</p>
+      </div>
+      <div class="graph-head-actions">
+        <button type="button" class="btn secondary sm" on:click={() => (mindMapOpen = false)}>{T('app.close')}</button>
+      </div>
+    </div>
+    <MindMap
+      blocks={roots}
+      pageTitle={pageTitle(pagePath)}
+      collapsedMap={collapsedState}
+      {selectedIds}
+      onToggleCollapse={toggleCollapse}
+      onToggleSelect={toggleSelect}
+      onUpdateNode={handleMindMapUpdate}
+      onMoveUnder={handleMindMapMoveUnder}
+      onInsertChild={handleMindMapInsertChild}
+      onRunCommand={handleRunBlockCommand}
+      onOpenTerminalContext={handleOpenTerminalContext}
+    />
+  </section>
   {:else}
   <section class="col-main outliner-panel">
     <h2>{T('app.outline')}</h2>
@@ -1292,6 +1470,8 @@
           onReorderBefore={handleReorderBefore}
           onSwipeTodo={handleSwipeTodo}
           onSwipeClear={handleSwipeClear}
+          onRunCommand={handleRunBlockCommand}
+          onOpenTerminalContext={handleOpenTerminalContext}
         />
       {/each}
     {/if}
@@ -1366,7 +1546,7 @@
     </aside>
   {/if}
 
-  <WorkspaceConsole {notesRoot} open={consoleOpen} onClose={() => (consoleOpen = false)} />
+  <WorkspaceConsole bind:this={consolePane} {notesRoot} open={consoleOpen} onClose={() => (consoleOpen = false)} />
   </section>
 </main>
 
@@ -1413,9 +1593,10 @@
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'outline' && !graphOpen && !settingsOpen}
+    class:active={mobilePanel === 'outline' && !graphOpen && !mindMapOpen && !settingsOpen}
     on:click={() => {
       graphOpen = false
+      mindMapOpen = false
       settingsOpen = false
       mobilePanel = 'outline'
     }}
@@ -1430,9 +1611,10 @@
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'pages' && !graphOpen && !settingsOpen}
+    class:active={mobilePanel === 'pages' && !graphOpen && !mindMapOpen && !settingsOpen}
     on:click={() => {
       graphOpen = false
+      mindMapOpen = false
       settingsOpen = false
       mobilePanel = 'pages'
     }}
@@ -1450,9 +1632,10 @@
   <button
     type="button"
     class="mobile-tab-btn"
-    class:active={mobilePanel === 'side' && !graphOpen && !settingsOpen}
+    class:active={mobilePanel === 'side' && !graphOpen && !mindMapOpen && !settingsOpen}
     on:click={() => {
       graphOpen = false
+      mindMapOpen = false
       settingsOpen = false
       mobilePanel = 'side'
     }}
@@ -1466,6 +1649,35 @@
       >
     </span>
     <span class="mobile-tab-lbl">{T('app.mobileNavSide')}</span>
+  </button>
+  <button
+    type="button"
+    class="mobile-tab-btn mobile-tab-iconish"
+    class:active={mindMapOpen}
+    aria-label={T('app.mobileNavMindMap')}
+    title={T('app.mobileNavMindMap')}
+    on:click={() => {
+      settingsOpen = false
+      openMindMap()
+    }}
+  >
+    <span class="mobile-tab-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24"
+        ><circle cx="5.5" cy="12" r="2.3" fill="currentColor" /><circle cx="13" cy="6" r="2.2" fill="currentColor" /><circle
+          cx="13"
+          cy="18"
+          r="2.2"
+          fill="currentColor"
+        /><circle cx="20" cy="12" r="2.1" fill="currentColor" /><path
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          d="M7.5 10.7 11.1 7.4M7.5 13.3l3.6 3.3M15.1 7.4 18.2 11M15.1 16.6l3.1-3.6"
+        /></svg
+      >
+    </span>
+    <span class="mobile-tab-lbl">{T('app.mobileNavMindMap')}</span>
   </button>
   <button
     type="button"
@@ -1504,6 +1716,7 @@
     title={T('app.mobileNavSettings')}
     on:click={() => {
       graphOpen = false
+      mindMapOpen = false
       void openSettings()
     }}
   >
