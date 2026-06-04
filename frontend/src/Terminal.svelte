@@ -1,8 +1,5 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte'
-  import { Terminal as XTerm } from '@xterm/xterm'
-  import { FitAddon } from '@xterm/addon-fit'
-  import '@xterm/xterm/css/xterm.css'
   import { WriteTerminalInput, ResizeTerminal } from '../wailsjs/go/bridge/App.js'
   import { EventsOn } from '../wailsjs/runtime/runtime.js'
 
@@ -66,7 +63,14 @@
     void fitAndResize()
   }
 
-  onMount(() => {
+  async function initTerminal() {
+    const [{ Terminal: XTerm }, { FitAddon }] = await Promise.all([
+      import('@xterm/xterm'),
+      import('@xterm/addon-fit'),
+      import('@xterm/xterm/css/xterm.css')
+    ])
+    if (disposed || !mountEl) return
+
     term = new XTerm({
       convertEol: true,
       cursorBlink: session?.kind !== 'command',
@@ -104,6 +108,10 @@
     resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => void fitAndResize()) : undefined
     if (mountEl && resizeObserver) resizeObserver.observe(mountEl)
     void fitAndResize()
+  }
+
+  onMount(() => {
+    void initTerminal()
   })
 
   onDestroy(() => {

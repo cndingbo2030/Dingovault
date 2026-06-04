@@ -8,6 +8,7 @@ All notable user-facing changes for Dingovault are listed here. We describe what
 - Terminal loop: command results are now structured Markdown with fenced output and queryable block properties, so `source:terminal` lists command history and `exitCode:1` finds failed runs across the vault.
 - Mind Map: large pages now hide minor deep labels until zoom/hover and auto-collapse deep branches on first open, keeping 500+ block outlines readable.
 - Mind Map export: SVG/PNG export now inlines themed colors and a CJK-capable font stack so bilingual labels survive off-document rasterization.
+- Terminal: xterm is lazy-loaded when a terminal opens, reducing the initial workspace bundle.
 
 ## v1.6.0 — Mind map, PTY terminal, and thinking-doing loop (2026-06-04)
 
