@@ -112,6 +112,7 @@
     "copied": "已复制 Markdown 大纲",
     "exported": "已导出 {format}",
     "labelsHidden": "放大可显示更多标签",
+    "autoCollapsed": "已折叠 {count} 个深层分支",
     "editNode": "编辑 {label}",
     "toggleCollapse": "折叠或展开 {label}",
     "addChildTo": "给 {label} 添加子节点",

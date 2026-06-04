@@ -112,6 +112,7 @@
     "copied": "Markdown outline copied",
     "exported": "Exported {format}",
     "labelsHidden": "zoom in to show more labels",
+    "autoCollapsed": "{count} deep branches collapsed",
     "editNode": "Edit {label}",
     "toggleCollapse": "Toggle branch for {label}",
     "addChildTo": "Add child to {label}",

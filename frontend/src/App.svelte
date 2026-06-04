@@ -338,6 +338,25 @@
     }
   }
 
+  /** @param {string[]} ids */
+  function autoCollapseNodes(ids) {
+    if (!ids?.length) return
+    const next = { ...collapsedState }
+    let changed = false
+    for (const id of ids) {
+      if (!id || next[id]) continue
+      next[id] = true
+      changed = true
+    }
+    if (!changed) return
+    collapsedState = next
+    try {
+      localStorage.setItem(collapseStorageKey(), JSON.stringify(collapsedState))
+    } catch {
+      /* ignore quota */
+    }
+  }
+
   /** @param {string} id @param {boolean} on */
   function toggleSelect(id, on) {
     if (on) {
@@ -1418,6 +1437,7 @@
       collapsedMap={collapsedState}
       {selectedIds}
       onToggleCollapse={toggleCollapse}
+      onAutoCollapse={autoCollapseNodes}
       onToggleSelect={toggleSelect}
       onUpdateNode={handleMindMapUpdate}
       onMoveUnder={handleMindMapMoveUnder}

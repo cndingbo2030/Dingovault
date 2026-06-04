@@ -16,6 +16,8 @@
   export let layout = 'tree'
   /** @type {(id: string) => void} */
   export let onToggleCollapse = () => {}
+  /** @type {(ids: string[]) => void} */
+  export let onAutoCollapse = () => {}
   /** @type {(id: string, on: boolean) => void} */
   export let onToggleSelect = () => {}
   /** @type {(id: string, text: string) => Promise<void>} */
@@ -38,6 +40,7 @@
   const w = 1600
   const h = 900
   const levelGap = 250
+  const largeNodeThreshold = 300
   const branchHues = [262, 202, 155, 28, 335, 226, 96, 12, 292, 178, 48, 5]
   const pathFor = linkHorizontal()
     .x((/** @type {any} */ d) => d.x)
@@ -58,6 +61,8 @@
   let editingId = ''
   let editingText = ''
   let lastSourceKey = ''
+  let autoCollapsedSourceKey = ''
+  let autoCollapsedCount = 0
   /** @type {HTMLInputElement | undefined} */
   let editInput
   /** @type {{ id: string, label: string, startX: number, startY: number, x: number, y: number, moved: boolean, descendants: Set<string> } | null} */
@@ -99,10 +104,18 @@
     return `hsl(${hue}, ${sat}%, ${light}%)`
   }
 
+  /** @param {any[]} nodes */
+  function sumSubtreeCount(nodes) {
+    let total = 0
+    for (const node of nodes || []) total += node.subtreeCount || 1
+    return total
+  }
+
   /** @param {any} block @param {number} branchIndex @param {number} depth */
   function decorateBlock(block, branchIndex, depth) {
     const id = String(block?.id || '')
     const children = Array.isArray(block?.children) ? block.children : []
+    const decoratedChildren = children.map((/** @type {any} */ child) => decorateBlock(child, branchIndex, depth + 1))
     return {
       id,
       label: cleanLabel(block?.content || id),
@@ -111,9 +124,11 @@
       synthetic: false,
       collapsed: !!collapsedMap[id],
       childCount: children.length,
+      subtreeCount: 1 + sumSubtreeCount(decoratedChildren),
+      major: false,
       branchIndex,
       branchColor: branchColor(branchIndex, depth),
-      children: children.map((/** @type {any} */ child) => decorateBlock(child, branchIndex, depth + 1))
+      children: decoratedChildren
     }
   }
 
@@ -127,6 +142,8 @@
       synthetic: true,
       collapsed: false,
       childCount: children.length,
+      subtreeCount: 1 + sumSubtreeCount(children),
+      major: true,
       branchIndex: -1,
       branchColor: 'var(--dv-accent)',
       children
@@ -161,6 +178,12 @@
     let minY = Infinity
     let maxY = -Infinity
     for (const node of nodes) {
+      const subtreeCount = node.data.subtreeCount || 1
+      node.data.major =
+        node.data.synthetic ||
+        node.depth <= 2 ||
+        node.data.childCount >= (total > largeNodeThreshold ? 4 : 3) ||
+        subtreeCount >= (total > largeNodeThreshold ? 22 : 12)
       const x = node.y + 92
       const y = node.x
       node.renderX = x
@@ -195,6 +218,7 @@
   $: if (mapTree.sourceKey !== lastSourceKey) {
     lastSourceKey = mapTree.sourceKey
     resetView()
+    autoCollapseLargeTree(mapTree)
   }
   $: zoomLabel = `${Math.round(zoom * 100)}%`
 
@@ -211,6 +235,20 @@
     fitToBounds(mapTree?.bounds || { minX: 0, maxX: w, minY: 0, maxY: h })
     hoveredId = ''
     dropTargetId = ''
+  }
+
+  /** @param {{ total: number, sourceKey: string, nodes: any[] }} treeData */
+  function autoCollapseLargeTree(treeData) {
+    autoCollapsedCount = 0
+    if (!treeData || treeData.total < largeNodeThreshold || treeData.sourceKey === autoCollapsedSourceKey) return
+    autoCollapsedSourceKey = treeData.sourceKey
+    const collapseDepth = treeData.total > 520 ? 3 : 4
+    const ids = treeData.nodes
+      .filter((node) => !node.data.synthetic && node.depth >= collapseDepth && node.data.childCount > 0 && !collapsedMap[node.data.id])
+      .map((node) => node.data.id)
+      .slice(0, 240)
+    autoCollapsedCount = ids.length
+    if (ids.length) onAutoCollapse(ids)
   }
 
   /** @param {{ clientX: number, clientY: number }} e */
@@ -342,8 +380,12 @@
   function labelVisible(node) {
     if (editingId === node.data.id) return false
     if (hoveredId === node.data.id || selectedSet.has(node.data.id)) return true
-    if (node.data.synthetic || node.depth <= 2) return true
+    if (node.data.synthetic || node.data.collapsed) return true
+    if (node.data.major) return true
     if (mapTree.total <= 130) return true
+    if (mapTree.total >= largeNodeThreshold) {
+      return zoom >= (node.depth > 4 ? 1.22 : 0.94)
+    }
     return zoom >= 0.82
   }
 
@@ -558,6 +600,21 @@
           >
             <circle class="node-halo" r={r + 11} />
             <circle class="node-core" r={r} />
+            {#if node.data.collapsed && hasChildren && !node.data.synthetic}
+              <g
+                class="collapsed-badge"
+                transform={`translate(${-r - 38},${-11})`}
+                role="button"
+                tabindex="0"
+                aria-label={T('mindmap.toggleCollapse', { label: node.data.label })}
+                on:pointerdown|stopPropagation
+                on:click|stopPropagation={() => onToggleCollapse(node.data.id)}
+                on:keydown={(e) => activateKey(e, () => onToggleCollapse(node.data.id))}
+              >
+                <rect x="0" y="0" width="32" height="22" rx="7" />
+                <text x="16" y="15">+{node.data.childCount}</text>
+              </g>
+            {/if}
             {#if hasChildren && !node.data.synthetic}
               <g
                 class="collapse-chip"
@@ -650,6 +707,9 @@
   </svg>
   <p class="caption">
     {mapTree.total} {T('mindmap.blocks')}
+    {#if mapTree.total >= largeNodeThreshold && autoCollapsedCount > 0}
+      · {T('mindmap.autoCollapsed', { count: autoCollapsedCount })}
+    {/if}
     {#if mapTree.total > 130 && zoom < 0.82}
       · {T('mindmap.labelsHidden')}
     {/if}
@@ -721,6 +781,22 @@
   }
   .mind-node.dragging {
     opacity: 0.42;
+  }
+  .collapsed-badge {
+    cursor: pointer;
+  }
+  .collapsed-badge rect {
+    fill: color-mix(in srgb, var(--dv-panel) 88%, var(--node-color) 12%);
+    stroke: color-mix(in srgb, var(--node-color) 58%, var(--dv-border));
+    stroke-width: 1;
+    filter: url(#mind-node-shadow);
+  }
+  .collapsed-badge text {
+    fill: var(--mind-label);
+    font-size: 11px;
+    font-weight: 560;
+    text-anchor: middle;
+    pointer-events: none;
   }
   .node-label {
     font-family: var(--dv-font, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif);
