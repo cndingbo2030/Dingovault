@@ -120,6 +120,10 @@ Loop workflows:
 2. **Run in node context**: the user opens a terminal from an outline or mind-map node. The node text is treated as a possible path/project hint; otherwise the current page folder is used. The terminal opens scoped to that cwd without executing anything automatically.
 3. **Think -> restructure -> execute -> record**: users can plan in the outline, view/restructure the same page as a mind map, run selected execution steps in the console, then keep the result under the originating block so later graph/search/AI flows can reason over the outcome.
 
+Run history read path:
+
+- The sidebar Run history inspector uses the existing `QueryBlocks("source:terminal")` path, then filters by current page, vault scope, or non-zero `exitCode` in the frontend. It does not introduce a second query engine. Rows navigate back to the source block via the result block's `parentId`, and re-run uses the same `RunBlockCommand(blockID, command, cwd, confirmed)` bridge method plus the same frontend `classifyCommand` confirmation flow. Mind-map nodes derive their green/red status glyph from terminal-result children in the same `GetPage` tree.
+
 Guardrail:
 
 - Block content is data, not trusted code. Dingovault never auto-executes a block during navigation, rendering, indexing, or mind-map layout. Execution requires a user click, and non-read-only commands require a confirmation containing the exact command text.

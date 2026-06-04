@@ -50,6 +50,7 @@
   import Backlinks from './Backlinks.svelte'
   import SemanticRelated from './SemanticRelated.svelte'
   import AIChatPanel from './AIChatPanel.svelte'
+  import RunHistory from './RunHistory.svelte'
   import WorkspaceConsole from './WorkspaceConsole.svelte'
   import SettingsDialog from './SettingsDialog.svelte'
   import CommandPalette from './CommandPalette.svelte'
@@ -96,7 +97,7 @@
   let consolePane
   let pagesOpen = true
   let inspectorOpen = true
-  /** @type {'backlinks' | 'related' | 'ai'} */
+  /** @type {'backlinks' | 'related' | 'history' | 'ai'} */
   let sideTab = 'backlinks'
   /** @type {'outline' | 'pages' | 'side'} */
   let mobilePanel = 'outline'
@@ -511,9 +512,16 @@
     return pageFolder(pagePath)
   }
 
-  /** @param {string} id @param {string} text */
-  async function handleRunBlockCommand(id, text) {
-    const cmd = commandFromBlockText(text)
+  /**
+   * All block-derived command execution goes through this gate. Stored commands are still
+   * untrusted data, so run history re-runs use the same classify + confirm path.
+   * @param {string} id
+   * @param {string} cmd
+   * @param {string} [sourcePage]
+   * @param {{ focusBlockId?: string }} [opts]
+   */
+  async function runCommandForBlock(id, cmd, sourcePage = pagePath, opts = {}) {
+    cmd = commandFromBlockText(cmd)
     if (!cmd) return
     const safety = classifyCommand(cmd)
     let confirmed = false
@@ -527,12 +535,30 @@
     await tick()
     try {
       await syncAllBlocksFromDOM()
-      const result = await consolePane?.runBlockCommand?.(id, cmd, pageFolder(pagePath), confirmed)
-      await loadPage(pagePath, { skipHistory: true, softNav: true, keepMindMap: mindMapOpen })
+      const result = await consolePane?.runBlockCommand?.(id, cmd, pageFolder(sourcePage || pagePath), confirmed)
+      indexEpoch += 1
+      const rel = sourcePage || pagePath
+      await loadPage(rel, {
+        skipHistory: true,
+        softNav: rel === pagePath,
+        keepMindMap: mindMapOpen && rel === pagePath,
+        focusBlockId: opts.focusBlockId
+      })
       if (result) pushToast(T('terminal.resultAppended', { exitCode: result.exitCode }), result.exitCode === 0 ? 'info' : 'error')
+      return result
     } catch (e) {
       await handleMutationError(e)
     }
+  }
+
+  /** @param {string} id @param {string} text */
+  async function handleRunBlockCommand(id, text) {
+    await runCommandForBlock(id, text, pagePath)
+  }
+
+  /** @param {string} id @param {string} command @param {string} rel */
+  async function handleRerunHistoryCommand(id, command, rel) {
+    await runCommandForBlock(id, command, rel || pagePath, { focusBlockId: id })
   }
 
   /** @param {string} _id @param {string} text */
@@ -1040,6 +1066,12 @@
     const rel = toRelPath(h.sourcePath, notesRoot)
     await loadPage(rel || pagePath)
   }
+
+  /** @param {string} rel @param {string} blockId */
+  async function openHistoryBlock(rel, blockId) {
+    if (!rel) return
+    await loadPage(rel, { focusBlockId: blockId })
+  }
 </script>
 
 <main
@@ -1531,16 +1563,29 @@
       >
         {T('sidebar.tabAI')}
       </button>
+      <button
+        type="button"
+        role="tab"
+        class="side-tab"
+        class:active={sideTab === 'history'}
+        aria-selected={sideTab === 'history'}
+        id="tab-history"
+        on:click={() => (sideTab = 'history')}
+      >
+        {T('sidebar.tabRuns')}
+      </button>
     </div>
     <div
       class="side-panel"
       role="tabpanel"
-      aria-labelledby={sideTab === 'backlinks' ? 'tab-backlinks' : sideTab === 'related' ? 'tab-related' : 'tab-ai'}
+      aria-labelledby={sideTab === 'backlinks' ? 'tab-backlinks' : sideTab === 'related' ? 'tab-related' : sideTab === 'history' ? 'tab-history' : 'tab-ai'}
     >
       {#if sideTab === 'backlinks'}
         <Backlinks {notesRoot} {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
       {:else if sideTab === 'related'}
         <SemanticRelated {pagePath} indexEpoch={indexEpoch} onOpenPage={(rel) => loadPage(rel)} />
+      {:else if sideTab === 'history'}
+        <RunHistory {notesRoot} {pagePath} indexEpoch={indexEpoch} onOpenBlock={openHistoryBlock} onRerunCommand={handleRerunHistoryCommand} />
       {:else}
         <AIChatPanel {pagePath} />
       {/if}
@@ -2636,8 +2681,8 @@
   }
   .side-tabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
     margin-bottom: 12px;
     flex-shrink: 0;
   }
@@ -3229,7 +3274,7 @@
     background: var(--dv-surface);
   }
   .side-tabs {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 3px;
     padding: 2px;
     border-radius: 5px;

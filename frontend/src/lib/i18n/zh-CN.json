@@ -117,7 +117,9 @@
     "toggleCollapse": "折叠或展开 {label}",
     "addChildTo": "给 {label} 添加子节点",
     "runCommand": "运行 {label} 的命令",
-    "openTerminalHere": "在 {label} 上下文打开终端"
+    "openTerminalHere": "在 {label} 上下文打开终端",
+    "terminalSuccess": "最近一次终端运行成功",
+    "terminalFailure": "最近一次终端运行退出码 {exitCode}"
   },
   "settings": {
     "options": "选项",
@@ -221,7 +223,30 @@
     "tablist": "侧栏面板",
     "tabBacklinks": "反向链接",
     "tabRelated": "语义相关",
+    "tabRuns": "运行",
     "tabAI": "AI 对话"
+  },
+  "runHistory": {
+    "aria": "运行历史",
+    "title": "运行历史",
+    "subtitle": "已写回笔记的可查询终端结果。",
+    "filters": "运行历史筛选",
+    "refresh": "刷新运行历史",
+    "scopePage": "本页",
+    "scopeVault": "全库",
+    "failedOnly": "失败",
+    "loading": "正在加载运行记录…",
+    "emptyTitle": "暂无运行记录",
+    "emptyHint": "将块作为命令运行后，可查询结果会显示在这里。",
+    "emptyFailedTitle": "暂无失败运行",
+    "emptyFailedHint": "全库失败结果会显示在这里。",
+    "openSource": "打开源块",
+    "rerun": "重新运行命令",
+    "ok": "成功",
+    "exitCode": "退出 {code}",
+    "now": "刚刚",
+    "unknownPath": "未知页面",
+    "commandFallback": "已存储命令"
   },
   "semantic": {
     "aria": "语义相关块",

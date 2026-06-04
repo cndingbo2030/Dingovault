@@ -106,6 +106,30 @@
     return `hsl(${hue}, ${sat}%, ${light}%)`
   }
 
+  /** @param {any} block */
+  function isTerminalResultBlock(block) {
+    return String(block?.properties?.source || '') === 'terminal'
+  }
+
+  /** @param {any[]} children */
+  function latestTerminalStatus(children) {
+    /** @type {{ exitCode: number, command: string, ranAtMs: number } | null} */
+    let latest = null
+    for (const child of children || []) {
+      if (!isTerminalResultBlock(child)) continue
+      const props = child.properties || {}
+      const exitCode = Number(props.exitCode)
+      const ranAtMs = Date.parse(props.ranAt || '')
+      const item = {
+        exitCode: Number.isFinite(exitCode) ? exitCode : 0,
+        command: String(props.command || ''),
+        ranAtMs: Number.isFinite(ranAtMs) ? ranAtMs : 0
+      }
+      if (!latest || item.ranAtMs >= latest.ranAtMs) latest = item
+    }
+    return latest
+  }
+
   /** @param {any[]} nodes */
   function sumSubtreeCount(nodes) {
     let total = 0
@@ -118,6 +142,7 @@
     const id = String(block?.id || '')
     const children = Array.isArray(block?.children) ? block.children : []
     const decoratedChildren = children.map((/** @type {any} */ child) => decorateBlock(child, branchIndex, depth + 1))
+    const terminalStatus = !isTerminalResultBlock(block) ? latestTerminalStatus(children) : null
     return {
       id,
       label: cleanLabel(block?.content || id),
@@ -130,6 +155,7 @@
       major: false,
       branchIndex,
       branchColor: branchColor(branchIndex, depth),
+      terminalStatus,
       children: decoratedChildren
     }
   }
@@ -502,7 +528,7 @@
         `fill:none;stroke:${computedStroke(source, '#8a8f98')};stroke-width:${cs.strokeWidth || '1.35px'};stroke-linecap:round;opacity:${cs.opacity || '0.46'}`
       )
     })
-    mapClonedElements(clone, '.node-halo,.node-core,.drag-ghost circle,.collapsed-badge rect', (source, target) => {
+    mapClonedElements(clone, '.node-halo,.node-core,.run-status,.drag-ghost circle,.collapsed-badge rect', (source, target) => {
       const cs = getComputedStyle(source)
       target.setAttribute(
         'style',
@@ -662,6 +688,15 @@
           >
             <circle class="node-halo" r={r + 11} />
             <circle class="node-core" r={r} />
+            {#if node.data.terminalStatus && !node.data.synthetic}
+              <circle class="run-status" class:failed={node.data.terminalStatus.exitCode !== 0} cx={-r - 4} cy={r + 4} r="4.8">
+                <title>
+                  {node.data.terminalStatus.exitCode === 0
+                    ? T('mindmap.terminalSuccess')
+                    : T('mindmap.terminalFailure', { exitCode: node.data.terminalStatus.exitCode })}
+                </title>
+              </circle>
+            {/if}
             {#if node.data.collapsed && hasChildren && !node.data.synthetic}
               <g
                 class="collapsed-badge"
@@ -828,6 +863,16 @@
     stroke-width: 2;
     filter: url(#mind-node-shadow);
     vector-effect: non-scaling-stroke;
+  }
+  .run-status {
+    fill: #1f9d66;
+    stroke: var(--mind-bg);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+  }
+  .run-status.failed {
+    fill: #d64f4f;
   }
   .mind-node.root .node-core {
     fill: var(--dv-fg);

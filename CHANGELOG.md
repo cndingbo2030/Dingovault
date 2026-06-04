@@ -13,6 +13,8 @@ All notable user-facing changes for Dingovault are listed here. We describe what
 
 - Terminal result blocks now include a `runId::` field; repeated runs append distinct, attributable history records rather than replacing prior evidence.
 - Added reproducible mind-map large-page performance notes for the 500+ block density strategy.
+- Added a Run history inspector that surfaces `source:terminal` records, filters failed runs, navigates back to source blocks, and re-runs stored commands through the same confirmation gate.
+- Mind-map nodes now show a green/red terminal status glyph when their latest child result succeeded or failed.
 
 ## v1.6.1 — Security and command-history patch (2026-06-04)
 

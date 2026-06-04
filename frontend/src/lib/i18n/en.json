@@ -117,7 +117,9 @@
     "toggleCollapse": "Toggle branch for {label}",
     "addChildTo": "Add child to {label}",
     "runCommand": "Run command from {label}",
-    "openTerminalHere": "Open terminal at {label}"
+    "openTerminalHere": "Open terminal at {label}",
+    "terminalSuccess": "Last terminal run succeeded",
+    "terminalFailure": "Last terminal run exited {exitCode}"
   },
   "settings": {
     "options": "Options",
@@ -221,7 +223,30 @@
     "tablist": "Sidebar panels",
     "tabBacklinks": "Backlinks",
     "tabRelated": "Related",
+    "tabRuns": "Runs",
     "tabAI": "AI Chat"
+  },
+  "runHistory": {
+    "aria": "Run history",
+    "title": "Run history",
+    "subtitle": "Queryable terminal results written back into notes.",
+    "filters": "Run history filters",
+    "refresh": "Refresh run history",
+    "scopePage": "Page",
+    "scopeVault": "Vault",
+    "failedOnly": "Failed",
+    "loading": "Loading runs…",
+    "emptyTitle": "No runs recorded",
+    "emptyHint": "Run a block as a command to append a queryable result here.",
+    "emptyFailedTitle": "No failed runs",
+    "emptyFailedHint": "Failures across the vault will appear here.",
+    "openSource": "open source block",
+    "rerun": "Re-run command",
+    "ok": "OK",
+    "exitCode": "exit {code}",
+    "now": "now",
+    "unknownPath": "Unknown page",
+    "commandFallback": "Stored command"
   },
   "semantic": {
     "aria": "Semantically related blocks",
