@@ -41,6 +41,8 @@
   const h = 900
   const levelGap = 250
   const largeNodeThreshold = 300
+  const exportFontStack =
+    '-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC","Source Han Sans SC",sans-serif'
   const branchHues = [262, 202, 155, 28, 335, 226, 96, 12, 292, 178, 48, 5]
   const pathFor = linkHorizontal()
     .x((/** @type {any} */ d) => d.x)
@@ -465,6 +467,60 @@
     URL.revokeObjectURL(url)
   }
 
+  /** @param {Element} el @param {string} fallback */
+  function computedFill(el, fallback) {
+    const fill = getComputedStyle(el).fill
+    return fill && fill !== 'none' ? fill : fallback
+  }
+
+  /** @param {Element} el @param {string} fallback */
+  function computedStroke(el, fallback) {
+    const stroke = getComputedStyle(el).stroke
+    return stroke && stroke !== 'none' ? stroke : fallback
+  }
+
+  /** @param {SVGSVGElement} clone @param {string} selector @param {(source: Element, target: Element) => void} apply */
+  function mapClonedElements(clone, selector, apply) {
+    if (!svgEl) return
+    const sourceEls = Array.from(svgEl.querySelectorAll(selector))
+    const cloneEls = Array.from(clone.querySelectorAll(selector))
+    const limit = Math.min(sourceEls.length, cloneEls.length)
+    for (let i = 0; i < limit; i += 1) apply(sourceEls[i], cloneEls[i])
+  }
+
+  /** @param {SVGSVGElement} clone */
+  function inlineExportStyles(clone) {
+    if (!svgEl) return
+    const bg = getComputedStyle(svgEl).backgroundColor || '#ffffff'
+    mapClonedElements(clone, '.mindmap-bg', (_source, target) => {
+      target.setAttribute('style', `fill:${bg}`)
+    })
+    mapClonedElements(clone, '.mind-link', (source, target) => {
+      const cs = getComputedStyle(source)
+      target.setAttribute(
+        'style',
+        `fill:none;stroke:${computedStroke(source, '#8a8f98')};stroke-width:${cs.strokeWidth || '1.35px'};stroke-linecap:round;opacity:${cs.opacity || '0.46'}`
+      )
+    })
+    mapClonedElements(clone, '.node-halo,.node-core,.drag-ghost circle,.collapsed-badge rect', (source, target) => {
+      const cs = getComputedStyle(source)
+      target.setAttribute(
+        'style',
+        `fill:${computedFill(source, '#8b6eea')};stroke:${computedStroke(source, bg)};stroke-width:${cs.strokeWidth || '0'};opacity:${cs.opacity || '1'}`
+      )
+    })
+    mapClonedElements(clone, '.node-label,.drag-ghost text,.collapsed-badge text', (source, target) => {
+      const cs = getComputedStyle(source)
+      target.setAttribute(
+        'style',
+        `font-family:${exportFontStack};font-size:${cs.fontSize || '14px'};font-weight:${cs.fontWeight || '400'};letter-spacing:0;fill:${computedFill(
+          source,
+          '#222222'
+        )};stroke:${computedStroke(source, bg)};stroke-width:${cs.strokeWidth || '0'};stroke-linejoin:round;paint-order:${cs.paintOrder || 'normal'}`
+      )
+    })
+  }
+
   function serializedSvg() {
     if (!svgEl) return ''
     const clone = /** @type {SVGSVGElement} */ (svgEl.cloneNode(true))
@@ -472,13 +528,19 @@
     clone.setAttribute('width', String(w))
     clone.setAttribute('height', String(h))
     for (const el of clone.querySelectorAll('foreignObject')) el.remove()
+    for (const el of clone.querySelectorAll('.collapse-chip,.add-chip,.run-chip,.context-chip')) el.remove()
+    // SVG exported through img->canvas is off-document, so CSS variables and inherited fonts
+    // are not reliable. Inline computed paint and a CJK-capable font stack before serializing.
+    inlineExportStyles(clone)
     const style = document.createElementNS('http://www.w3.org/2000/svg', 'style')
+    const bg = getComputedStyle(svgEl).backgroundColor || '#fff'
+    const fg = getComputedStyle(document.documentElement).getPropertyValue('--dv-fg').trim() || '#222'
     style.textContent = `
-      .mindmap-bg{fill:${getComputedStyle(svgEl).backgroundColor || '#fff'}}
-      .mind-link{fill:none;stroke:var(--link-color,#8a8f98);stroke-width:1.35;stroke-linecap:round;opacity:.48}
-      .mind-node .node-core{fill:var(--node-color,#8b6eea);stroke:${getComputedStyle(svgEl).backgroundColor || '#fff'};stroke-width:2}
-      .mind-node .node-halo{fill:var(--node-color,#8b6eea);opacity:.14}
-      .mind-node .node-label{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif;font-size:14px;fill:${getComputedStyle(document.documentElement).getPropertyValue('--dv-fg') || '#222'};paint-order:stroke;stroke:${getComputedStyle(svgEl).backgroundColor || '#fff'};stroke-width:5;stroke-linejoin:round}
+      .mindmap-bg{fill:${bg}}
+      .mind-link{fill:none;stroke:#8a8f98;stroke-width:1.35;stroke-linecap:round;opacity:.48}
+      .mind-node .node-core{fill:#8b6eea;stroke:${bg};stroke-width:2}
+      .mind-node .node-halo{fill:#8b6eea;opacity:.14}
+      .mind-node .node-label{font-family:${exportFontStack};font-size:14px;fill:${fg};paint-order:stroke;stroke:${bg};stroke-width:5;stroke-linejoin:round}
     `
     clone.insertBefore(style, clone.firstChild)
     return new XMLSerializer().serializeToString(clone)
