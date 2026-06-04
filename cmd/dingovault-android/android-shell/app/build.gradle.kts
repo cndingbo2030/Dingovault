@@ -59,7 +59,7 @@ android {
         applicationId = "com.dingovault.mobile"
         minSdk = 24
         targetSdk = 34
-        versionCode = 10600
+        versionCode = 10601
         versionName = dvVersionName
     }
 
