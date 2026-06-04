@@ -146,8 +146,8 @@ export function ResolveWikilink(arg1) {
   return window['go']['bridge']['App']['ResolveWikilink'](arg1);
 }
 
-export function RunBlockCommand(arg1, arg2, arg3) {
-  return window['go']['bridge']['App']['RunBlockCommand'](arg1, arg2, arg3);
+export function RunBlockCommand(arg1, arg2, arg3, arg4) {
+  return window['go']['bridge']['App']['RunBlockCommand'](arg1, arg2, arg3, arg4);
 }
 
 export function RunVaultCommand(arg1) {

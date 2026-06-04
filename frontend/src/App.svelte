@@ -58,6 +58,7 @@
   import { pushToast } from './toastStore.js'
   import { toolbarEntries, sidebarEntries } from './pluginRegistry.js'
   import { hapticLight } from './lib/haptic.js'
+  import { classifyCommand } from './lib/commandSafety.js'
 
   let notesRoot = ''
   let pagePath = 'README.md'
@@ -471,12 +472,6 @@
     }
   }
 
-  /** @param {string} command */
-  function isPlainReadOnlyCommand(command) {
-    const cmd = command.trim()
-    return /^(pwd|ls\b|find\b|rg\b|grep\b|cat\b|head\b|tail\b|less\b|git\s+(status|diff|log|show|branch|rev-parse)\b)/.test(cmd)
-  }
-
   /** @param {string} text */
   function commandFromBlockText(text) {
     return String(text || '')
@@ -501,16 +496,19 @@
   async function handleRunBlockCommand(id, text) {
     const cmd = commandFromBlockText(text)
     if (!cmd) return
-    if (!isPlainReadOnlyCommand(cmd)) {
+    const safety = classifyCommand(cmd)
+    let confirmed = false
+    if (!safety.readOnly) {
       const ok = window.confirm(T('terminal.confirmRun', { command: cmd }))
       if (!ok) return
+      confirmed = true
     }
     err = ''
     consoleOpen = true
     await tick()
     try {
       await syncAllBlocksFromDOM()
-      const result = await consolePane?.runBlockCommand?.(id, cmd, pageFolder(pagePath))
+      const result = await consolePane?.runBlockCommand?.(id, cmd, pageFolder(pagePath), confirmed)
       await loadPage(pagePath, { skipHistory: true, softNav: true, keepMindMap: mindMapOpen })
       if (result) pushToast(T('terminal.resultAppended', { exitCode: result.exitCode }), result.exitCode === 0 ? 'info' : 'error')
     } catch (e) {

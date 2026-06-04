@@ -7,6 +7,7 @@
   "author": "cndingbo2030 <cndingbo@outlook.com>",
   "scripts": {
     "dev": "vite",
+    "test": "node --test tests/commandSafety.test.js",
     "build": "vite build",
     "build:android": "DV_WEB_BASE=./ vite build",
     "preview": "vite preview",

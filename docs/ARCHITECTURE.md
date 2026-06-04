@@ -123,6 +123,10 @@ Guardrail:
 
 - Block content is data, not trusted code. Dingovault never auto-executes a block during navigation, rendering, indexing, or mind-map layout. Execution requires a user click, and non-read-only commands require a confirmation containing the exact command text.
 
+Trust boundaries:
+
+- `RunVaultCommand` executes commands the user types directly into the console; that path represents explicit user intent and remains an arbitrary command runner scoped to the vault root. `RunBlockCommand` executes text sourced from Markdown blocks, sync, AI output, or shared vault content; that text is untrusted data and is gated by the shared frontend/backend `ClassifyCommand` rules plus an explicit confirmation flag before the backend will execute anything non-read-only.
+
 ## Migration and Integrity
 
 - SQLite schema uses `PRAGMA user_version` and incremental migrations.

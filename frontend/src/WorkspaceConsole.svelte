@@ -89,10 +89,10 @@
     return info
   }
 
-  /** @param {string} blockID @param {string} cmd @param {string} cwd */
-  export async function runBlockCommand(blockID, cmd, cwd = '') {
+  /** @param {string} blockID @param {string} cmd @param {string} cwd @param {boolean} confirmed */
+  export async function runBlockCommand(blockID, cmd, cwd = '', confirmed = false) {
     open = true
-    const result = await RunBlockCommand(blockID, cmd, cwd)
+    const result = await RunBlockCommand(blockID, cmd, cwd, confirmed)
     upsertSession({ id: result.sessionId, cwd: result.cwd, kind: 'command', command: result.command })
     sessions = sessions.map((s) => (s.id === result.sessionId ? { ...s, exitCode: result.exitCode } : s))
     activeSessionId = result.sessionId

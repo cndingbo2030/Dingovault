@@ -77,7 +77,7 @@ export function ResolveTerminalCwd(arg1:string):Promise<string>;
 
 export function ResolveWikilink(arg1:string):Promise<string>;
 
-export function RunBlockCommand(arg1:string,arg2:string,arg3:string):Promise<bridge.TerminalCommandResultDTO>;
+export function RunBlockCommand(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<bridge.TerminalCommandResultDTO>;
 
 export function RunVaultCommand(arg1:string):Promise<bridge.ConsoleCommandResult>;
 

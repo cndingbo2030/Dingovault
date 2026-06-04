@@ -2,6 +2,10 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
+## Unreleased (2026-06-04)
+
+- Security: block-derived terminal commands now use shared frontend/backend read-only classification, require confirmation for shell control characters or non-read-only commands, and are refused by the backend if that confirmation is missing.
+
 ## v1.6.0 — Mind map, PTY terminal, and thinking-doing loop (2026-06-04)
 
 - Added a live page-level Mind Map view that renders the current outline tree instead of the vault-wide relationship graph.

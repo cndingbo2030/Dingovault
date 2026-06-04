@@ -97,7 +97,11 @@ func (a *App) CloseTerminalSession(sessionID string) error {
 }
 
 // RunBlockCommand executes command in a PTY, streams output to the console, and appends a child result block.
-func (a *App) RunBlockCommand(blockID, command, cwd string) (TerminalCommandResultDTO, error) {
+func (a *App) RunBlockCommand(blockID, command, cwd string, confirmed bool) (TerminalCommandResultDTO, error) {
+	readOnly, reason := terminal.ClassifyCommand(command)
+	if !readOnly && !confirmed {
+		return TerminalCommandResultDTO{}, fmt.Errorf("block command requires confirmation: %s", reason)
+	}
 	if a.graph == nil {
 		return TerminalCommandResultDTO{}, fmt.Errorf("%s", a.t(locale.ErrGraphNotInit))
 	}
