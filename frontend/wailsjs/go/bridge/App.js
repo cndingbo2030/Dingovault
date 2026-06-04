@@ -178,6 +178,10 @@ export function SetTheme(arg1) {
   return window['go']['bridge']['App']['SetTheme'](arg1);
 }
 
+export function Shutdown(arg1) {
+  return window['go']['bridge']['App']['Shutdown'](arg1);
+}
+
 export function StartAIInlineStream(arg1, arg2, arg3) {
   return window['go']['bridge']['App']['StartAIInlineStream'](arg1, arg2, arg3);
 }

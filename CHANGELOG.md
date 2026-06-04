@@ -2,6 +2,18 @@
 
 All notable user-facing changes for Dingovault are listed here. We describe what you gain in daily use, not internal implementation details.
 
+## Unreleased (2026-06-04)
+
+### Fixes
+
+- Block properties now require an explicit `properties:` region, so ordinary prose containing `::` is not treated as metadata.
+- Terminal sessions are closed on app shutdown and when the vault root changes.
+
+### Terminal Loop
+
+- Terminal result blocks now include a `runId::` field; repeated runs append distinct, attributable history records rather than replacing prior evidence.
+- Added reproducible mind-map large-page performance notes for the 500+ block density strategy.
+
 ## v1.6.1 — Security and command-history patch (2026-06-04)
 
 ### Security

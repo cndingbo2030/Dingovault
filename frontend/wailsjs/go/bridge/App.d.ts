@@ -93,6 +93,8 @@ export function SetSyncSettings(arg1:bridge.SyncSettingsDTO):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 
+export function Shutdown(arg1:context.Context):Promise<void>;
+
 export function StartAIInlineStream(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function StartLANSyncAdvertise():Promise<string>;

@@ -304,12 +304,18 @@ func listItemPlainText(li *ast.ListItem, src []byte) string {
 
 var blockPropertyLine = regexp.MustCompile(`^\s*([A-Za-z][A-Za-z0-9_-]*)::\s*(.*?)\s*$`)
 
-// blockPropertiesFromContent extracts Logseq-style block properties from Markdown source lines.
-// Syntax: key:: value. Only whole lines outside fenced code blocks are properties.
+// blockPropertiesFromContent extracts explicit Logseq-style block properties from Markdown source lines.
+// Syntax:
+//
+//	properties:
+//	key:: value
+//
+// Only whole lines in that explicit region, outside fenced code blocks, are properties.
 func blockPropertiesFromContent(content string) map[string]string {
 	var props map[string]string
 	inFence := false
 	fenceMarker := ""
+	inProperties := false
 	for _, line := range strings.Split(content, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if isFenceBoundary(trimmed, fenceMarker) {
@@ -325,8 +331,17 @@ func blockPropertiesFromContent(content string) map[string]string {
 		if inFence {
 			continue
 		}
+		if !inProperties {
+			if strings.EqualFold(trimmed, "properties:") {
+				inProperties = true
+			}
+			continue
+		}
 		m := blockPropertyLine.FindStringSubmatch(line)
 		if len(m) != 3 {
+			if trimmed != "" {
+				inProperties = false
+			}
 			continue
 		}
 		value := strings.TrimSpace(m[2])

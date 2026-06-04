@@ -8,6 +8,7 @@ import (
 
 	"github.com/cndingbo2030/dingovault/internal/locale"
 	"github.com/cndingbo2030/dingovault/internal/terminal"
+	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -33,16 +34,35 @@ func (a *App) getTerminalManager() (*terminal.Manager, error) {
 		return nil, fmt.Errorf("%s", a.t(locale.ErrNotesRootNotSet))
 	}
 	a.terminalMu.Lock()
-	defer a.terminalMu.Unlock()
 	if a.terminalManager != nil && a.terminalManager.Root() == root {
+		defer a.terminalMu.Unlock()
 		return a.terminalManager, nil
+	}
+	old := a.terminalManager
+	a.terminalManager = nil
+	a.terminalMu.Unlock()
+	if old != nil {
+		old.Shutdown()
 	}
 	mgr, err := terminal.NewManager(root, a.emitTerminalEvent)
 	if err != nil {
 		return nil, err
 	}
+	a.terminalMu.Lock()
+	defer a.terminalMu.Unlock()
 	a.terminalManager = mgr
 	return mgr, nil
+}
+
+// shutdownTerminalSessions closes all live PTY sessions for app shutdown or vault replacement.
+func (a *App) shutdownTerminalSessions() {
+	a.terminalMu.Lock()
+	mgr := a.terminalManager
+	a.terminalManager = nil
+	a.terminalMu.Unlock()
+	if mgr != nil {
+		mgr.Shutdown()
+	}
 }
 
 func (a *App) emitTerminalEvent(name string, payload map[string]any) {
@@ -141,12 +161,15 @@ func terminalResultBlockContent(result terminal.CommandResult) string {
 	if output == "" {
 		output = "(no output)"
 	}
+	now := time.Now().UTC()
 	fence := markdownFence(output)
 	return strings.Join([]string{
 		"Terminal result",
+		"properties:",
+		"runId:: " + uuid.NewString(),
 		"source:: terminal",
 		fmt.Sprintf("exitCode:: %d", result.ExitCode),
-		"ranAt:: " + time.Now().UTC().Format(time.RFC3339),
+		"ranAt:: " + now.Format(time.RFC3339Nano),
 		fmt.Sprintf("durationMs:: %d", result.DurationMs),
 		"command:: " + singleLinePropertyValue(result.Command),
 		"output:",

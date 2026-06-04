@@ -173,6 +173,7 @@ func Shutdown() {
 	}
 	indexingBus = nil
 	if app != nil {
+		app.Shutdown(context.Background())
 		app.StopLANSyncAdvertise()
 		app = nil
 	}

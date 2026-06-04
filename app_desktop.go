@@ -261,6 +261,7 @@ func runDesktopApp(cfg config.Config, app *bridge.App, idx *scanner.Indexer, not
 			}()
 		},
 		OnShutdown: func(ctx context.Context) {
+			app.Shutdown(ctx)
 			app.StopLANSyncAdvertise()
 			fresh, err := config.Load()
 			if err != nil {

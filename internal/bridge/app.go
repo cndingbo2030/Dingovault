@@ -73,6 +73,11 @@ func (a *App) Startup(ctx context.Context) {
 	a.ctx = tenant.WithUserID(ctx, tenant.LocalUserID)
 }
 
+// Shutdown releases app-owned runtime resources.
+func (a *App) Shutdown(_ context.Context) {
+	a.shutdownTerminalSessions()
+}
+
 func (a *App) uiLocale() string {
 	c, err := config.Load()
 	if err != nil {

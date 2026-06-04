@@ -184,6 +184,24 @@ func (m *Manager) CloseSession(sessionID string) error {
 	return nil
 }
 
+// Shutdown closes every live PTY session owned by this manager.
+func (m *Manager) Shutdown() {
+	m.mu.Lock()
+	sessions := make([]*Session, 0, len(m.sessions))
+	for id, s := range m.sessions {
+		sessions = append(sessions, s)
+		delete(m.sessions, id)
+	}
+	m.mu.Unlock()
+
+	for _, s := range sessions {
+		_ = s.pty.Close()
+		if s.cmd.Process != nil {
+			_ = s.cmd.Process.Kill()
+		}
+	}
+}
+
 // RunCommand runs command in a PTY-backed non-interactive shell and returns bounded output.
 func (m *Manager) RunCommand(ctx context.Context, cwd, command string) (CommandResult, error) {
 	command = strings.TrimSpace(command)

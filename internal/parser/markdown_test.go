@@ -70,6 +70,7 @@ func TestEngine_ListItemsHaveDistinctIDs(t *testing.T) {
 
 func TestEngine_BlockProperties(t *testing.T) {
 	src := []byte(`- Terminal result
+  properties:
   source:: terminal
   exitCode:: 1
   durationMs:: 42
@@ -110,6 +111,20 @@ func TestEngine_BlockProperties(t *testing.T) {
 	}
 	if result.Properties["not-terminal"] != "" {
 		t.Fatalf("code fence content leaked into properties: %+v", result.Properties)
+	}
+}
+
+func TestEngine_BlockPropertiesAreConservative(t *testing.T) {
+	src := []byte("- https://example.test/a::b is a URL-like token\n- ratio 3::1 is prose\n- `code:: value` is inline code\n- note:: ordinary prose\n- 中文：不是属性\n")
+	e := NewEngine()
+	res, err := e.ParseSource(src, "/tmp/prose.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range res.Blocks {
+		if len(b.Properties) != 0 {
+			t.Fatalf("ordinary block %q parsed as properties: %+v", b.Content, b.Properties)
+		}
 	}
 }
 

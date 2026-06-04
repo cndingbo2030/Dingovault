@@ -23,7 +23,7 @@ Core layers:
 - Parse output includes:
   - block hierarchy (IDs, parent-child, outline levels, line ranges),
   - page properties/frontmatter,
-  - block properties from whole-line `key:: value` Markdown syntax,
+  - block properties from an explicit `properties:` region containing whole-line `key:: value` entries,
   - wikilinks and tags.
 
 ### 2) Goldmark AST -> SQLite Index
@@ -116,7 +116,7 @@ Frontend:
 
 Loop workflows:
 
-1. **Run block as command**: the user explicitly clicks a terminal action on an outline or mind-map node. Dingovault shows the exact command and confirms anything that is not a simple read-only command. The backend runs the command in a PTY, streams output to the console, and appends a child Markdown block with `source:: terminal`, `exitCode::`, `ranAt::`, `durationMs::`, `command::`, and fenced `text` output. Because these are block properties, `QueryBlocks` can find command history with queries like `source:terminal` or failures with `exitCode:1`.
+1. **Run block as command**: the user explicitly clicks a terminal action on an outline or mind-map node. Dingovault shows the exact command and confirms anything that is not a simple read-only command. The backend runs the command in a PTY, streams output to the console, and appends an immutable child Markdown history block with `properties:`, `runId::`, `source:: terminal`, `exitCode::`, `ranAt::`, `durationMs::`, `command::`, and fenced `text` output. Re-running the same command appends another explicit history block rather than replacing prior evidence; each result block is safe to delete by hand. Because these are block properties, `QueryBlocks` can find command history with queries like `source:terminal` or failures with `exitCode:1`.
 2. **Run in node context**: the user opens a terminal from an outline or mind-map node. The node text is treated as a possible path/project hint; otherwise the current page folder is used. The terminal opens scoped to that cwd without executing anything automatically.
 3. **Think -> restructure -> execute -> record**: users can plan in the outline, view/restructure the same page as a mind map, run selected execution steps in the console, then keep the result under the originating block so later graph/search/AI flows can reason over the outcome.
 
@@ -127,6 +127,10 @@ Guardrail:
 Trust boundaries:
 
 - `RunVaultCommand` executes commands the user types directly into the console; that path represents explicit user intent and remains an arbitrary command runner scoped to the vault root. `RunBlockCommand` executes text sourced from Markdown blocks, sync, AI output, or shared vault content; that text is untrusted data and is gated by the shared frontend/backend `ClassifyCommand` rules plus an explicit confirmation flag before the backend will execute anything non-read-only.
+
+Block property syntax:
+
+- Dingovault indexes block properties only inside an explicit `properties:` region in a block. Property lines use `key:: value`, continue until a non-property line, and are ignored inside fenced code blocks. Ordinary prose containing `::`, URLs, ratios, inline code, or CJK full-width punctuation is not treated as metadata. Reindexing reads Markdown into SQLite only; it does not reformat synced Markdown, so WebDAV/S3 sync does not create conflict churn for property-looking prose.
 
 ## Migration and Integrity
 

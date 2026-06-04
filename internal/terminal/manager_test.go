@@ -113,6 +113,37 @@ func TestRunCommandCapturesPTYOutput(t *testing.T) {
 	}
 }
 
+func TestShutdownClosesAllSessions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("pty lifecycle test requires a Unix-style PTY")
+	}
+	events := newEventRecorder()
+	m, err := NewManager(t.TempDir(), events.emit)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := m.StartSession(context.Background(), "", 20, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := m.StartSession(context.Background(), "", 20, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Shutdown()
+
+	if err := m.WriteInput(first.ID, "printf leak\n"); err == nil {
+		t.Fatal("WriteInput after Shutdown succeeded, want session not found")
+	}
+	if err := m.WriteInput(second.ID, "printf leak\n"); err == nil {
+		t.Fatal("WriteInput after Shutdown succeeded, want session not found")
+	}
+	if !events.waitEvents(EventExit, []string{first.ID, second.ID}, 3*time.Second) {
+		t.Fatalf("did not receive exit events for all sessions; events=%v", events.snapshot())
+	}
+}
+
 type recordedEvent struct {
 	name string
 	id   string
@@ -167,6 +198,25 @@ func (r *eventRecorder) waitEvent(name, sessionID string, timeout time.Duration)
 			return false
 		}
 	}
+}
+
+func (r *eventRecorder) waitEvents(name string, sessionIDs []string, timeout time.Duration) bool {
+	want := map[string]bool{}
+	for _, id := range sessionIDs {
+		want[id] = true
+	}
+	deadline := time.After(timeout)
+	for len(want) > 0 {
+		select {
+		case ev := <-r.ch:
+			if ev.name == name && want[ev.id] {
+				delete(want, ev.id)
+			}
+		case <-deadline:
+			return false
+		}
+	}
+	return true
 }
 
 func (r *eventRecorder) snapshot() []recordedEvent {
