@@ -23,6 +23,7 @@ Core layers:
 - Parse output includes:
   - block hierarchy (IDs, parent-child, outline levels, line ranges),
   - page properties/frontmatter,
+  - block properties from whole-line `key:: value` Markdown syntax,
   - wikilinks and tags.
 
 ### 2) Goldmark AST -> SQLite Index
@@ -115,7 +116,7 @@ Frontend:
 
 Loop workflows:
 
-1. **Run block as command**: the user explicitly clicks a terminal action on an outline or mind-map node. Dingovault shows the exact command and confirms anything that is not a simple read-only command. The backend runs the command in a PTY, streams output to the console, and appends a child Markdown block with `source: terminal`, `exitCode`, `ranAt`, the command, and output.
+1. **Run block as command**: the user explicitly clicks a terminal action on an outline or mind-map node. Dingovault shows the exact command and confirms anything that is not a simple read-only command. The backend runs the command in a PTY, streams output to the console, and appends a child Markdown block with `source:: terminal`, `exitCode::`, `ranAt::`, `durationMs::`, `command::`, and fenced `text` output. Because these are block properties, `QueryBlocks` can find command history with queries like `source:terminal` or failures with `exitCode:1`.
 2. **Run in node context**: the user opens a terminal from an outline or mind-map node. The node text is treated as a possible path/project hint; otherwise the current page folder is used. The terminal opens scoped to that cwd without executing anything automatically.
 3. **Think -> restructure -> execute -> record**: users can plan in the outline, view/restructure the same page as a mind map, run selected execution steps in the console, then keep the result under the originating block so later graph/search/AI flows can reason over the outcome.
 

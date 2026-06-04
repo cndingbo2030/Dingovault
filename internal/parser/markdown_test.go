@@ -68,6 +68,51 @@ func TestEngine_ListItemsHaveDistinctIDs(t *testing.T) {
 	}
 }
 
+func TestEngine_BlockProperties(t *testing.T) {
+	src := []byte(`- Terminal result
+  source:: terminal
+  exitCode:: 1
+  durationMs:: 42
+  command:: git status --short
+  output:
+  ` + "```text" + `
+  source:: not-terminal
+  exitCode:: 0
+  ` + "```" + `
+- Plain block
+`)
+	e := NewEngine()
+	res, err := e.ParseSource(src, "/tmp/properties.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var result *domain.Block
+	for i := range res.Blocks {
+		if strings.HasPrefix(res.Blocks[i].Content, "Terminal result") {
+			result = &res.Blocks[i]
+			break
+		}
+	}
+	if result == nil {
+		t.Fatal("terminal result block not found")
+	}
+	want := map[string]string{
+		"source":     "terminal",
+		"exitCode":   "1",
+		"durationMs": "42",
+		"command":    "git status --short",
+	}
+	for key, val := range want {
+		if result.Properties[key] != val {
+			t.Fatalf("property %s = %q, want %q; props=%+v", key, result.Properties[key], val, result.Properties)
+		}
+	}
+	if result.Properties["not-terminal"] != "" {
+		t.Fatalf("code fence content leaked into properties: %+v", result.Properties)
+	}
+}
+
 func contains(xs []string, v string) bool {
 	for _, x := range xs {
 		if x == v {

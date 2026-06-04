@@ -5,6 +5,7 @@ All notable user-facing changes for Dingovault are listed here. We describe what
 ## Unreleased (2026-06-04)
 
 - Security: block-derived terminal commands now use shared frontend/backend read-only classification, require confirmation for shell control characters or non-read-only commands, and are refused by the backend if that confirmation is missing.
+- Terminal loop: command results are now structured Markdown with fenced output and queryable block properties, so `source:terminal` lists command history and `exitCode:1` finds failed runs across the vault.
 
 ## v1.6.0 — Mind map, PTY terminal, and thinking-doing loop (2026-06-04)
 

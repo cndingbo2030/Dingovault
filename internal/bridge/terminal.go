@@ -141,15 +141,39 @@ func terminalResultBlockContent(result terminal.CommandResult) string {
 	if output == "" {
 		output = "(no output)"
 	}
+	fence := markdownFence(output)
 	return strings.Join([]string{
 		"Terminal result",
-		"source: terminal",
-		fmt.Sprintf("exitCode: %d", result.ExitCode),
-		"ranAt: " + time.Now().UTC().Format(time.RFC3339),
-		"command: " + result.Command,
+		"source:: terminal",
+		fmt.Sprintf("exitCode:: %d", result.ExitCode),
+		"ranAt:: " + time.Now().UTC().Format(time.RFC3339),
+		fmt.Sprintf("durationMs:: %d", result.DurationMs),
+		"command:: " + singleLinePropertyValue(result.Command),
 		"output:",
+		fence + "text",
 		output,
+		fence,
 	}, "\n")
+}
+
+func singleLinePropertyValue(value string) string {
+	return strings.Join(strings.Fields(strings.ReplaceAll(value, "\r", "\n")), " ")
+}
+
+func markdownFence(content string) string {
+	n := 3
+	run := 0
+	for _, r := range content {
+		if r == '`' {
+			run++
+			if run >= n {
+				n = run + 1
+			}
+			continue
+		}
+		run = 0
+	}
+	return strings.Repeat("`", n)
 }
 
 // ResolveTerminalCwd returns a safe absolute cwd for a vault-relative path or the vault root.

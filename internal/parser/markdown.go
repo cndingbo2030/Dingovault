@@ -3,6 +3,7 @@ package parser
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -131,7 +132,7 @@ func (e *Engine) emitParagraphBlock(
 		ID:         id,
 		ParentID:   parentID,
 		Content:    content,
-		Properties: nil,
+		Properties: blockPropertiesFromContent(content),
 		Metadata: domain.BlockMetadata{
 			SourcePath: sourcePath,
 			LineStart:  lineStart,
@@ -159,7 +160,7 @@ func (e *Engine) emitHeadingBlock(
 		ID:         id,
 		ParentID:   "",
 		Content:    content,
-		Properties: nil,
+		Properties: blockPropertiesFromContent(content),
 		Metadata: domain.BlockMetadata{
 			SourcePath: sourcePath,
 			LineStart:  lineStart,
@@ -248,7 +249,7 @@ func (e *Engine) walkList(
 			ID:         id,
 			ParentID:   parentID,
 			Content:    content,
-			Properties: nil,
+			Properties: blockPropertiesFromContent(content),
 			Metadata: domain.BlockMetadata{
 				SourcePath: sourcePath,
 				LineStart:  lineStart,
@@ -299,6 +300,55 @@ func listItemPlainText(li *ast.ListItem, src []byte) string {
 		}
 	}
 	return buf.String()
+}
+
+var blockPropertyLine = regexp.MustCompile(`^\s*([A-Za-z][A-Za-z0-9_-]*)::\s*(.*?)\s*$`)
+
+// blockPropertiesFromContent extracts Logseq-style block properties from Markdown source lines.
+// Syntax: key:: value. Only whole lines outside fenced code blocks are properties.
+func blockPropertiesFromContent(content string) map[string]string {
+	var props map[string]string
+	inFence := false
+	fenceMarker := ""
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if isFenceBoundary(trimmed, fenceMarker) {
+			if inFence {
+				inFence = false
+				fenceMarker = ""
+			} else {
+				inFence = true
+				fenceMarker = trimmed[:3]
+			}
+			continue
+		}
+		if inFence {
+			continue
+		}
+		m := blockPropertyLine.FindStringSubmatch(line)
+		if len(m) != 3 {
+			continue
+		}
+		value := strings.TrimSpace(m[2])
+		if value == "" {
+			continue
+		}
+		if props == nil {
+			props = map[string]string{}
+		}
+		props[m[1]] = value
+	}
+	return props
+}
+
+func isFenceBoundary(trimmed, activeMarker string) bool {
+	if len(trimmed) < 3 {
+		return false
+	}
+	if activeMarker != "" {
+		return strings.HasPrefix(trimmed, activeMarker)
+	}
+	return strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")
 }
 
 func collectRefs(blockID string, root ast.Node, src []byte, out *ParseResult) {
